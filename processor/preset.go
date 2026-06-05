@@ -73,6 +73,16 @@ func (p Preset) IsBundle() bool {
 	return p.Kind == KindDocumentPDF
 }
 
+// IsBackgroundRemove reports whether the preset runs the ONNX background-removal
+// pipeline rather than the libvips one. These presets only produce output in a
+// binary built with the `onnx` tag; in a vips-only build they return
+// ErrONNXNotBuilt (see processor/bg.go). Callers that exercise the libvips path
+// without ONNX compiled in (e.g. the vips-tagged tests) should partition these
+// out, just as they do bundle presets.
+func (p Preset) IsBackgroundRemove() bool {
+	return p.Kind == KindBackgroundRemove
+}
+
 // OutputFile is one named file inside a multi-file preset (e.g. a favicon pack
 // member). Name is the path relative to the preset's folder in the ZIP.
 type OutputFile struct {
