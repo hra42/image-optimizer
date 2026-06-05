@@ -6,6 +6,7 @@ import (
 	"flag"
 	"io/fs"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"os/signal"
@@ -66,6 +67,12 @@ func main() {
 	dist, err := fs.Sub(frontendDist, "frontend/dist")
 	if err != nil {
 		log.Fatalf("failed to scope embedded frontend: %v", err)
+	}
+	// Go's default MIME table has no entry for .webmanifest, so the static
+	// middleware would serve site.webmanifest as text/plain. Register the spec
+	// type so browsers accept it as a PWA manifest.
+	if err := mime.AddExtensionType(".webmanifest", "application/manifest+json"); err != nil {
+		log.Printf("warning: could not register .webmanifest MIME type: %v", err)
 	}
 	app.Get("/*", static.New("", static.Config{
 		FS:     dist,

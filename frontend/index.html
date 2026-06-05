@@ -3,7 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Image Optimizer</title>
+
+    <title>Image Optimizer — resize & re-encode for web and social</title>
+    <meta
+      name="description"
+      content="Drop images, pick targets, and download optimized variants as a ZIP. Resize and re-encode to WebP, AVIF, JPEG, PNG, social sizes, and a full favicon pack — all in your browser session."
+    />
+
+    <!-- Catppuccin Mocha base — tints the mobile browser chrome. -->
+    <meta name="theme-color" content="#1e1e2e" />
+
+    <!-- Favicons. SVG for modern browsers (crisp at any size); PNG fallbacks
+         for older browsers and iOS, which ignores SVG favicons. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph (Facebook, LinkedIn, Slack, Discord…). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Image Optimizer" />
+    <meta
+      property="og:description"
+      content="Resize and re-encode images to web and social formats, then download them all as a ZIP."
+    />
+    <meta property="og:image" content="/og.svg" />
+
+    <!-- Twitter / X large-image card. -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Image Optimizer" />
+    <meta
+      name="twitter:description"
+      content="Resize and re-encode images to web and social formats, then download them all as a ZIP."
+    />
+    <meta name="twitter:image" content="/og.svg" />
   </head>
   <body>
     <div id="app"></div>
