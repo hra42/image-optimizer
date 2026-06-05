@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/static"
 
 	"github.com/hra42/image-optimizer/handlers"
+	"github.com/hra42/image-optimizer/processor"
 )
 
 // frontendDist embeds the compiled Svelte SPA. The Docker frontend stage
@@ -21,6 +22,12 @@ var frontendDist embed.FS
 
 func main() {
 	app := fiber.New()
+
+	// Initialize libvips (real config in vips builds; no-op otherwise).
+	if err := processor.Startup(); err != nil {
+		log.Fatalf("processor startup: %v", err)
+	}
+	defer processor.Shutdown()
 
 	// Health check — used by Docker and load balancers.
 	app.Get("/health", handlers.Health)

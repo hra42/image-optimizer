@@ -5,6 +5,7 @@ go 1.26.3
 require (
 	github.com/davidbyttow/govips/v2 v2.18.0
 	github.com/gofiber/fiber/v3 v3.3.0
+	golang.org/x/sync v0.20.0
 )
 
 require (
