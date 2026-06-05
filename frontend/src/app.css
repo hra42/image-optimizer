@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+
+/* Catppuccin Mocha palette as CSS variables (per HRA-165). These are the
+   single source of truth for theme colors; the @theme block below exposes them
+   to Tailwind so utilities like bg-ctp-base / text-ctp-text / border-ctp-mauve
+   are generated. */
+:root {
+  --ctp-base: #1e1e2e;
+  --ctp-surface0: #313244;
+  --ctp-surface1: #45475a;
+  --ctp-overlay0: #6c7086;
+  --ctp-text: #cdd6f4;
+  --ctp-subtext1: #bac2de;
+  --ctp-mauve: #cba6f7;
+  --ctp-blue: #89b4fa;
+  --ctp-green: #a6e3a1;
+  --ctp-peach: #fab387;
+  --ctp-red: #f38ba8;
+}
+
+/* Map the palette onto Tailwind color tokens (Tailwind v4 @theme). */
+@theme {
+  --color-ctp-base: var(--ctp-base);
+  --color-ctp-surface0: var(--ctp-surface0);
+  --color-ctp-surface1: var(--ctp-surface1);
+  --color-ctp-overlay0: var(--ctp-overlay0);
+  --color-ctp-text: var(--ctp-text);
+  --color-ctp-subtext1: var(--ctp-subtext1);
+  --color-ctp-mauve: var(--ctp-mauve);
+  --color-ctp-blue: var(--ctp-blue);
+  --color-ctp-green: var(--ctp-green);
+  --color-ctp-peach: var(--ctp-peach);
+  --color-ctp-red: var(--ctp-red);
+}
+
+html,
+body {
+  background: var(--ctp-base);
+  color: var(--ctp-text);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
