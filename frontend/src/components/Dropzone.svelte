@@ -12,13 +12,22 @@
   let dragDepth = 0;
 
   // Accepted input types, mirroring the backend (handlers/upload.go).
-  const ACCEPT_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.avif'];
-  const ACCEPT_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+  // HEIC/HEIF are iPhone photos — libvips decodes them server-side.
+  const ACCEPT_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif'];
+  const ACCEPT_MIME = [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/avif',
+    'image/heic',
+    'image/heif',
+  ];
 
   function isAccepted(file) {
     const name = file.name.toLowerCase();
     const byExt = ACCEPT_EXT.some((ext) => name.endsWith(ext));
-    // AVIF MIME is unreliable across browsers, so accept on extension too.
+    // AVIF and HEIC MIME are unreliable across browsers, so accept on
+    // extension too.
     const byMime = ACCEPT_MIME.includes(file.type);
     return byExt || byMime;
   }
@@ -132,11 +141,11 @@
         d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
       />
     </svg>
-    <span class="font-medium text-ctp-text">
+    <span class="text-lg font-medium text-ctp-text">
       {dragActive ? 'Drop images to add them' : 'Drag & drop images here'}
     </span>
-    <span class="text-sm text-ctp-subtext1">
-      or click to browse — JPEG, PNG, WebP, AVIF
+    <span class="text-base text-ctp-subtext1">
+      or click to browse — JPEG, PNG, WebP, AVIF, HEIC
     </span>
   </button>
 
@@ -145,7 +154,7 @@
     type="file"
     class="hidden"
     multiple
-    accept="image/jpeg,image/png,image/webp,image/avif,.jpg,.jpeg,.png,.webp,.avif"
+    accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.avif,.heic,.heif"
     onchange={onInputChange}
   />
 
@@ -161,10 +170,10 @@
             class="h-12 w-12 flex-none rounded object-cover"
           />
           <div class="min-w-0 flex-1">
-            <p class="truncate text-sm text-ctp-text" title={entry.file.name}>
+            <p class="truncate text-base text-ctp-text" title={entry.file.name}>
               {entry.file.name}
             </p>
-            <p class="text-xs text-ctp-subtext1">{formatSize(entry.file.size)}</p>
+            <p class="text-sm text-ctp-subtext1">{formatSize(entry.file.size)}</p>
           </div>
           <button
             type="button"

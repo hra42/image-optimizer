@@ -14,7 +14,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if err := Startup(); err != nil {
+	if err := Startup(0); err != nil {
 		panic(err)
 	}
 	defer Shutdown()
@@ -57,6 +57,13 @@ func TestProcessAllPresets(t *testing.T) {
 			t.Errorf("preset %q failed: %v", r.Preset.Name, r.Err)
 			continue
 		}
+
+		// Pack presets return a set of named files instead of a single image.
+		if r.Preset.Kind == KindFaviconPack {
+			assertFaviconPack(t, r)
+			continue
+		}
+
 		if len(r.Data) == 0 {
 			t.Errorf("preset %q produced empty output", r.Preset.Name)
 			continue
@@ -83,6 +90,57 @@ func TestProcessAllPresets(t *testing.T) {
 			t.Errorf("preset %q decoded %dx%d, want %dx%d", r.Preset.Name, out.Width(), out.Height(), wantW, wantH)
 		}
 		out.Close()
+	}
+}
+
+// assertFaviconPack checks the favicon pack has every expected member, that the
+// PNGs decode to their named square dimensions, and that favicon.ico is present
+// and non-empty.
+func assertFaviconPack(t *testing.T, r Result) {
+	t.Helper()
+
+	if len(r.Files) == 0 {
+		t.Fatalf("favicon pack produced no files")
+	}
+
+	byName := make(map[string][]byte, len(r.Files))
+	for _, f := range r.Files {
+		if len(f.Data) == 0 {
+			t.Errorf("favicon member %q is empty", f.Name)
+		}
+		byName[f.Name] = f.Data
+	}
+
+	// Every named PNG size must be present and decode to its square dimension.
+	wantPNG := map[string]int{
+		"favicon-16x16.png":          16,
+		"favicon-32x32.png":          32,
+		"favicon-48x48.png":          48,
+		"apple-touch-icon.png":       180,
+		"android-chrome-192x192.png": 192,
+		"android-chrome-512x512.png": 512,
+	}
+	for name, px := range wantPNG {
+		data, ok := byName[name]
+		if !ok {
+			t.Errorf("favicon pack missing %q", name)
+			continue
+		}
+		img, err := vips.NewImageFromBuffer(data)
+		if err != nil {
+			t.Errorf("favicon member %q failed to decode: %v", name, err)
+			continue
+		}
+		if img.Width() != px || img.Height() != px {
+			t.Errorf("favicon member %q is %dx%d, want %dx%d", name, img.Width(), img.Height(), px, px)
+		}
+		img.Close()
+	}
+
+	for _, name := range []string{"favicon.ico", "site.webmanifest", "README.txt"} {
+		if _, ok := byName[name]; !ok {
+			t.Errorf("favicon pack missing %q", name)
+		}
 	}
 }
 

@@ -12,6 +12,8 @@ export const PRESET_GROUPS = [
     presets: [
       { name: 'website_webp', label: 'WebP', dims: 'Original size' },
       { name: 'website_avif', label: 'AVIF', dims: 'Original size' },
+      { name: 'jpeg_original', label: 'JPEG', dims: 'Original size' },
+      { name: 'png_original', label: 'PNG', dims: 'Original size' },
     ],
   },
   {
@@ -30,8 +32,30 @@ export const PRESET_GROUPS = [
     presets: [{ name: 'twitter', label: 'Post', dims: '1200×675' }],
   },
   {
+    category: 'Facebook',
+    presets: [{ name: 'facebook_post', label: 'Post', dims: '1200×630' }],
+  },
+  {
+    category: 'Pinterest',
+    presets: [{ name: 'pinterest_pin', label: 'Pin', dims: '1000×1500' }],
+  },
+  {
     category: 'Open Graph',
     presets: [{ name: 'og_image', label: 'OG image', dims: '1200×630' }],
+  },
+  {
+    category: 'Icons & Thumbnails',
+    presets: [
+      { name: 'favicon', label: 'Favicon pack', dims: 'Full icon set + manifest' },
+      { name: 'thumbnail', label: 'Thumbnail', dims: '400×400' },
+    ],
+  },
+  {
+    category: 'Banners',
+    presets: [
+      { name: 'email_header', label: 'Email header', dims: '600×200' },
+      { name: 'web_banner', label: 'Web banner', dims: '1920×480' },
+    ],
   },
 ];
 

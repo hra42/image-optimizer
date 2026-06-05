@@ -18,17 +18,23 @@ import (
 var errNoPresets = errors.New("no valid presets selected")
 
 // allowedExts is the set of input extensions we accept. It backstops content
-// sniffing, which does not reliably recognize AVIF.
+// sniffing, which does not reliably recognize AVIF or HEIC/HEIF — both are
+// admitted by extension only (see allowedSniffed). HEIC/HEIF are decoded by
+// libvips' heifload (libheif/libde265), so iPhone photos convert just like any
+// other input.
 var allowedExts = map[string]bool{
 	".jpg":  true,
 	".jpeg": true,
 	".png":  true,
 	".webp": true,
 	".avif": true,
+	".heic": true,
+	".heif": true,
 }
 
 // allowedSniffed is the set of MIME types http.DetectContentType may return for
-// our supported inputs. AVIF is absent on purpose — it is admitted by extension.
+// our supported inputs. AVIF and HEIC/HEIF are absent on purpose — the stdlib
+// sniffer does not recognize them, so they are admitted by extension.
 var allowedSniffed = map[string]bool{
 	"image/jpeg": true,
 	"image/png":  true,
@@ -126,7 +132,7 @@ func readValidImage(fh *multipart.FileHeader, maxFileBytes int64) ([]byte, error
 	ext := strings.ToLower(filepath.Ext(fh.Filename))
 	sniff := http.DetectContentType(data) // reads up to the first 512 bytes
 	if !allowedSniffed[sniff] && !allowedExts[ext] {
-		return nil, fmt.Errorf("%q is not a supported image (JPEG, PNG, WebP, AVIF)", fh.Filename)
+		return nil, fmt.Errorf("%q is not a supported image (JPEG, PNG, WebP, AVIF, HEIC)", fh.Filename)
 	}
 	return data, nil
 }

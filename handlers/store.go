@@ -23,11 +23,17 @@ type progressEvent struct {
 }
 
 // outFile is one finished (file, preset) output destined for the ZIP.
+//
+// A normal image preset sets data + format and leaves pack nil: it becomes one
+// ZIP entry named "<preset>.<ext>". A pack preset (e.g. favicon) sets pack to
+// its member files and leaves data nil: each member becomes an entry under a
+// "<preset>/" folder in the ZIP.
 type outFile struct {
 	srcBase string
 	preset  string
 	format  processor.Format
 	data    []byte
+	pack    []processor.OutputFile
 }
 
 // srcFile is one uploaded image held in memory while its job runs.
@@ -324,6 +330,7 @@ func runJob(job *Job, files []srcFile, presets []processor.Preset) {
 						preset:  r.Preset.Name,
 						format:  r.Preset.Format,
 						data:    r.Data,
+						pack:    r.Files,
 					})
 				}
 				job.publishLocked(progressEvent{
