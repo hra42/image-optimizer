@@ -54,6 +54,10 @@ func main() {
 		log.Fatalf("processor startup: %v", err)
 	}
 
+	// Record the background-removal (ONNX) paths. No-op effect unless the binary
+	// was built with the `onnx` tag; the onnx pipeline reads these on first use.
+	processor.ConfigureBackground(cfg.ONNXModelPath, cfg.ONNXRuntimeLibPath)
+
 	// Root context canceled on SIGINT/SIGTERM; drives the reaper and shutdown.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

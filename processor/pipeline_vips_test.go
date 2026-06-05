@@ -39,15 +39,19 @@ func makeSourcePNG(t *testing.T, w, h int) []byte {
 	return buf.Bytes()
 }
 
-// nonBundlePresets returns the registry minus bundle presets (document PDFs),
-// mirroring how the upload handler partitions them away from the per-file
-// Process path.
-func nonBundlePresets() []Preset {
+// vipsPipelinePresets returns the registry minus presets that don't run through
+// the per-file libvips Process path in a vips-only build: bundle presets (document
+// PDFs, which go through ProcessBundle) and background-removal presets (which go
+// through the ONNX path, unavailable without the `onnx` tag). This mirrors how the
+// upload handler partitions bundles away, and keeps these vips tests from
+// asserting on presets the vips pipeline never produces.
+func vipsPipelinePresets() []Preset {
 	var out []Preset
 	for _, p := range AllPresets() {
-		if !p.IsBundle() {
-			out = append(out, p)
+		if p.IsBundle() || p.IsBackgroundRemove() {
+			continue
 		}
+		out = append(out, p)
 	}
 	return out
 }
@@ -59,7 +63,9 @@ func TestProcessAllPresets(t *testing.T) {
 	// Bundle presets (document PDFs) consume all files at once and go through
 	// ProcessBundle, not the per-file Process path — the handler partitions them
 	// out, so mirror that here and cover them in TestProcessBundleDocumentPDF.
-	presets := nonBundlePresets()
+	// Background-removal presets run the ONNX path (no `onnx` tag here), so they're
+	// partitioned out too.
+	presets := vipsPipelinePresets()
 	results, err := Process(context.Background(), src, presets)
 	if err != nil {
 		t.Fatalf("Process returned error: %v", err)
@@ -180,8 +186,9 @@ func TestProcessSVGInput(t *testing.T) {
 		t.Fatal("isSVG did not recognize the SVG source")
 	}
 
-	// Bundle presets go through ProcessBundle, not the per-file Process path.
-	results, err := Process(context.Background(), src, nonBundlePresets())
+	// Bundle presets go through ProcessBundle, not the per-file Process path;
+	// background-removal presets go through the ONNX path (not built here).
+	results, err := Process(context.Background(), src, vipsPipelinePresets())
 	if err != nil {
 		t.Fatalf("Process returned error: %v", err)
 	}

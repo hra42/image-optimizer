@@ -33,6 +33,7 @@
     yellow: 'from-ctp-yellow to-ctp-peach',
     peach: 'from-ctp-peach to-ctp-yellow',
     green: 'from-ctp-green to-ctp-sky',
+    flamingo: 'from-ctp-flamingo to-ctp-pink',
   };
   let barClass = $derived(
     failed

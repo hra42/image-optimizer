@@ -17,6 +17,12 @@ func processImage(buf []byte, p Preset) Result {
 	if p.Kind == KindFaviconPack {
 		return buildFaviconPack(buf, p)
 	}
+	// Background removal runs the ONNX path (onnx build tag), not libvips. The
+	// dispatch seam is tag-free (processor/bg.go); when ONNX isn't compiled in it
+	// returns ErrONNXNotBuilt in Result.Err, failing only this preset.
+	if p.Kind == KindBackgroundRemove {
+		return removeBackground(buf, p)
+	}
 	// Bundle presets (document PDFs) consume all files at once and must go
 	// through ProcessBundle, not the per-file path. The handler partitions them
 	// out before they reach here; this guards against a caller that doesn't.
