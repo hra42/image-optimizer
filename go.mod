@@ -7,6 +7,8 @@ require (
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/gofiber/fiber/v3 v3.3.0
 	github.com/google/uuid v1.6.0
+	github.com/yalue/onnxruntime_go v1.31.0
+	golang.org/x/image v0.38.0
 	golang.org/x/sync v0.20.0
 )
 
@@ -22,7 +24,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.71.0 // indirect
 	golang.org/x/crypto v0.51.0 // indirect
-	golang.org/x/image v0.38.0 // indirect
 	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
