@@ -38,6 +38,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The checkout dir is owned by a different UID inside the container, so git
+      # refuses to read it and Go's VCS stamping (-buildvcs) fails. Mark it safe.
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Install libvips
         run: |
           apt-get update
