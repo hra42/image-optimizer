@@ -85,6 +85,15 @@ var presets = []Preset{
 	{Name: "jpeg_original", Format: FormatJPEG, Quality: 80, Progressive: true},
 	{Name: "png_original", Format: FormatPNG, Compression: 6},
 
+	// Convert: faithful, high-quality format conversion at the original size —
+	// the "just turn my iPhone HEIC into a usable file" path. Higher quality
+	// than the web-optimized website_* presets so the output stays close to the
+	// source. No resize/crop.
+	{Name: "convert_jpeg", Format: FormatJPEG, Quality: 92, Progressive: true},
+	{Name: "convert_png", Format: FormatPNG, Compression: 6},
+	{Name: "convert_webp", Format: FormatWebP, Quality: 90},
+	{Name: "convert_avif", Format: FormatAVIF, Quality: 80, Effort: 4},
+
 	{Name: "instagram_square", Format: FormatJPEG, Width: 1080, Height: 1080, Quality: 80, Progressive: true},
 	{Name: "instagram_portrait", Format: FormatJPEG, Width: 1080, Height: 1350, Quality: 80, Progressive: true},
 	{Name: "linkedin", Format: FormatJPEG, Width: 1200, Height: 627, Quality: 80, Progressive: true},

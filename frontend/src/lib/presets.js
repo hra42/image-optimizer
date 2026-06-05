@@ -8,6 +8,15 @@
 
 export const PRESET_GROUPS = [
   {
+    category: 'Convert (full size)',
+    presets: [
+      { name: 'convert_jpeg', label: 'To JPEG', dims: 'Original size · high quality' },
+      { name: 'convert_png', label: 'To PNG', dims: 'Original size · lossless' },
+      { name: 'convert_webp', label: 'To WebP', dims: 'Original size · high quality' },
+      { name: 'convert_avif', label: 'To AVIF', dims: 'Original size · high quality' },
+    ],
+  },
+  {
     category: 'Website',
     presets: [
       { name: 'website_webp', label: 'WebP', dims: 'Original size' },
