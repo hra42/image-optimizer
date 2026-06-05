@@ -27,3 +27,9 @@ func Shutdown() {}
 func Process(ctx context.Context, buf []byte, presets []Preset) ([]Result, error) {
 	return nil, ErrVipsNotBuilt
 }
+
+// ProcessStream reports that libvips support was not compiled in. The onResult
+// callback is never invoked in this build.
+func ProcessStream(ctx context.Context, buf []byte, presets []Preset, onResult ResultFunc) ([]Result, error) {
+	return nil, ErrVipsNotBuilt
+}

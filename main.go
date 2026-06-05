@@ -20,8 +20,16 @@ import (
 //go:embed all:frontend/dist
 var frontendDist embed.FS
 
+// maxUploadBytes caps the whole multipart request body. Fiber v3 defaults to
+// 4 MB; uploads carry up to several 50 MB images, so the limit is raised to give
+// headroom for multiple files plus multipart boundaries. Per-file 50 MB
+// enforcement lives in the upload handler.
+const maxUploadBytes = 64 << 20
+
 func main() {
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit: maxUploadBytes,
+	})
 
 	// Initialize libvips (real config in vips builds; no-op otherwise).
 	if err := processor.Startup(); err != nil {
@@ -29,8 +37,9 @@ func main() {
 	}
 	defer processor.Shutdown()
 
-	// Health check — used by Docker and load balancers.
-	app.Get("/health", handlers.Health)
+	// API routes (health, upload, progress SSE, download). Registered before the
+	// SPA catch-all so they are not swallowed by the wildcard route.
+	handlers.RegisterRoutes(app)
 
 	// Serve the embedded Svelte SPA at the root.
 	dist, err := fs.Sub(frontendDist, "frontend/dist")

@@ -45,6 +45,12 @@ type Result struct {
 	Err    error
 }
 
+// ResultFunc is invoked once per preset as soon as that preset finishes, on the
+// goroutine that produced it. Because presets complete in parallel it must be
+// safe for concurrent calls, and because it runs while holding a worker slot it
+// must not block for long. i is the preset's index in the input slice.
+type ResultFunc func(i int, r Result)
+
 // presets is the canonical registry, defined once in spec order.
 var presets = []Preset{
 	{Name: "website_webp", Format: FormatWebP, Quality: 80},
