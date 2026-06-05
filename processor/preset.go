@@ -117,6 +117,7 @@ var presets = []Preset{
 
 	{Name: "instagram_square", Format: FormatJPEG, Width: 1080, Height: 1080, Quality: 80, Progressive: true},
 	{Name: "instagram_portrait", Format: FormatJPEG, Width: 1080, Height: 1350, Quality: 80, Progressive: true},
+	{Name: "instagram_story", Format: FormatJPEG, Width: 1080, Height: 1920, Quality: 80, Progressive: true},
 	{Name: "linkedin", Format: FormatJPEG, Width: 1200, Height: 627, Quality: 80, Progressive: true},
 	{Name: "linkedin_profile_banner", Format: FormatJPEG, Width: 1584, Height: 396, Quality: 80, Progressive: true},
 	{Name: "linkedin_company_banner", Format: FormatJPEG, Width: 1128, Height: 191, Quality: 80, Progressive: true},

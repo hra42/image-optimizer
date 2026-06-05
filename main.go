@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -77,6 +78,23 @@ func main() {
 	app.Get("/*", static.New("", static.Config{
 		FS:     dist,
 		Browse: false,
+		// Cache-Control is the contract that keeps a hashed-asset SPA consistent
+		// behind a CDN (Cloudflare here). Vite fingerprints everything under
+		// /assets/ (index-<hash>.js/.css), so those are immutable and safe to
+		// cache forever — the URL changes whenever the content does. index.html
+		// (and any deep-link path that falls back to it) references those hashes
+		// and must NEVER be cached, or a redeploy leaves the CDN serving an old
+		// HTML shell pointing at asset hashes the origin no longer has (404 +
+		// "MIME type text/plain" style failures). ModifyResponse runs after the
+		// middleware's default header and only on successful responses.
+		ModifyResponse: func(c fiber.Ctx) error {
+			if strings.HasPrefix(c.Path(), "/assets/") {
+				c.Set(fiber.HeaderCacheControl, "public, max-age=31536000, immutable")
+			} else {
+				c.Set(fiber.HeaderCacheControl, "no-cache")
+			}
+			return nil
+		},
 	}))
 
 	// Serve in a goroutine so main can wait for a shutdown signal.

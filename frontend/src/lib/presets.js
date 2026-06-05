@@ -40,6 +40,7 @@ export const PRESET_GROUPS = [
     presets: [
       { name: 'instagram_square', label: 'Square', dims: '1080×1080', help: 'Classic 1:1 Instagram feed post. Crops/fits your image to a perfect square.' },
       { name: 'instagram_portrait', label: 'Portrait', dims: '1080×1350', help: 'Tall 4:5 Instagram post — takes up more screen space in the feed than a square.' },
+      { name: 'instagram_story', label: 'Story', dims: '1080×1920', help: 'Full-screen 9:16 Instagram Story or Reel. Fills the whole phone screen vertically.' },
     ],
   },
   {
