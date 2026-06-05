@@ -13,8 +13,14 @@
   --ctp-subtext1: #bac2de;
   --ctp-mauve: #cba6f7;
   --ctp-blue: #89b4fa;
+  --ctp-sapphire: #74c7ec;
+  --ctp-sky: #89dceb;
+  --ctp-teal: #94e2d5;
   --ctp-green: #a6e3a1;
+  --ctp-yellow: #f9e2af;
   --ctp-peach: #fab387;
+  --ctp-pink: #f5c2e7;
+  --ctp-lavender: #b4befe;
   --ctp-red: #f38ba8;
 }
 
@@ -28,8 +34,14 @@
   --color-ctp-subtext1: var(--ctp-subtext1);
   --color-ctp-mauve: var(--ctp-mauve);
   --color-ctp-blue: var(--ctp-blue);
+  --color-ctp-sapphire: var(--ctp-sapphire);
+  --color-ctp-sky: var(--ctp-sky);
+  --color-ctp-teal: var(--ctp-teal);
   --color-ctp-green: var(--ctp-green);
+  --color-ctp-yellow: var(--ctp-yellow);
   --color-ctp-peach: var(--ctp-peach);
+  --color-ctp-pink: var(--ctp-pink);
+  --color-ctp-lavender: var(--ctp-lavender);
   --color-ctp-red: var(--ctp-red);
 }
 
@@ -49,4 +61,97 @@ body {
     Roboto,
     sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* A faint mauve/blue aurora behind everything so the flat base isn't dead
+     space. Fixed so it doesn't scroll; very low alpha so content stays legible. */
+  background-image:
+    radial-gradient(40rem 40rem at 12% -8%, color-mix(in oklab, var(--ctp-mauve) 14%, transparent), transparent 60%),
+    radial-gradient(36rem 36rem at 92% 0%, color-mix(in oklab, var(--ctp-blue) 12%, transparent), transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+/* ── Shared motion vocabulary ─────────────────────────────────────────────
+   A small set of reusable keyframes + utility classes so every component
+   animates with the same timing and easing. Each respects the user's
+   reduced-motion preference (see the media query at the bottom). */
+
+@keyframes ctp-fade-up {
+  from { opacity: 0; transform: translateY(0.75rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ctp-pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes ctp-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+@keyframes ctp-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ctp-mauve) 45%, transparent); }
+  50%      { box-shadow: 0 0 1.25rem 0.25rem color-mix(in oklab, var(--ctp-mauve) 22%, transparent); }
+}
+
+@keyframes ctp-bar-stripes {
+  from { background-position: 0 0; }
+  to   { background-position: 2rem 0; }
+}
+
+@keyframes ctp-gradient-pan {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Entrance — fade + rise. Add `style="animation-delay: …"` to stagger. */
+.animate-fade-up {
+  animation: ctp-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* One-shot celebratory pop (e.g. on a value/state change). */
+.animate-pop {
+  animation: ctp-pop 0.4s ease-out;
+}
+
+/* Living, panning gradient text — for the title. */
+.text-gradient-aurora {
+  background-image: linear-gradient(
+    100deg,
+    var(--ctp-mauve),
+    var(--ctp-blue),
+    var(--ctp-sapphire),
+    var(--ctp-pink),
+    var(--ctp-mauve)
+  );
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ctp-gradient-pan 8s ease-in-out infinite;
+}
+
+/* Diagonal sheen that sweeps across a filling progress bar while it's active. */
+.bar-shimmer {
+  background-image: linear-gradient(
+    110deg,
+    transparent 25%,
+    color-mix(in oklab, white 55%, transparent) 50%,
+    transparent 75%
+  );
+  background-size: 200% 100%;
+  animation: ctp-shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

@@ -115,10 +115,10 @@
 <div class="flex flex-col gap-4">
   <button
     type="button"
-    class="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors
+    class="group flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-12 text-center transition-all duration-300
            {dragActive
-      ? 'border-ctp-mauve bg-ctp-surface0'
-      : 'border-ctp-surface1 bg-ctp-base hover:border-ctp-overlay0'}
+      ? 'scale-[1.01] border-ctp-mauve bg-gradient-to-br from-ctp-surface0 to-ctp-base shadow-lg shadow-ctp-mauve/30'
+      : 'border-ctp-surface1 bg-ctp-base hover:border-ctp-mauve/60 hover:bg-ctp-surface0/40'}
            {disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}"
     {disabled}
     ondrop={onDrop}
@@ -128,7 +128,9 @@
     onclick={openPicker}
   >
     <svg
-      class="h-10 w-10 {dragActive ? 'text-ctp-mauve' : 'text-ctp-overlay0'}"
+      class="h-10 w-10 transition-all duration-300 {dragActive
+        ? '-translate-y-1 scale-110 text-ctp-mauve'
+        : 'text-ctp-overlay0 group-hover:-translate-y-0.5 group-hover:text-ctp-mauve'}"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -141,7 +143,7 @@
         d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
       />
     </svg>
-    <span class="text-lg font-medium text-ctp-text">
+    <span class="text-lg font-medium {dragActive ? 'text-ctp-mauve' : 'text-ctp-text'}">
       {dragActive ? 'Drop images to add them' : 'Drag & drop images here'}
     </span>
     <span class="text-base text-ctp-subtext1">
@@ -162,12 +164,13 @@
     <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {#each files as entry, i (entry.url)}
         <li
-          class="relative flex items-center gap-3 rounded-lg border border-ctp-surface1 bg-ctp-surface0 p-2"
+          class="animate-fade-up relative flex items-center gap-3 rounded-lg border border-ctp-surface1 bg-ctp-surface0 p-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-ctp-mauve/50 hover:shadow-md hover:shadow-ctp-mauve/10"
+          style="animation-delay: {Math.min(i, 12) * 40}ms"
         >
           <img
             src={entry.url}
             alt={entry.file.name}
-            class="h-12 w-12 flex-none rounded object-cover"
+            class="h-12 w-12 flex-none rounded object-cover ring-1 ring-ctp-surface1"
           />
           <div class="min-w-0 flex-1">
             <p class="truncate text-base text-ctp-text" title={entry.file.name}>
@@ -177,7 +180,7 @@
           </div>
           <button
             type="button"
-            class="flex-none rounded p-1 text-ctp-overlay0 hover:text-ctp-red"
+            class="flex-none rounded p-1 text-ctp-overlay0 transition-all duration-200 hover:rotate-90 hover:scale-110 hover:bg-ctp-red/10 hover:text-ctp-red"
             aria-label="Remove {entry.file.name}"
             onclick={() => removeAt(i)}
           >
