@@ -2,42 +2,11 @@
   // PresetSelector: grouped checkbox grid of the output presets. The set of
   // selected preset names is bound back to the parent via `selected`.
   //
-  // There is no backend /presets endpoint, so this registry mirrors
-  // processor/preset.go. Names must match the backend verbatim — they are sent
-  // as-is in the upload's `presets` field.
+  // The preset registry lives in ../lib/presets.js (shared with ProgressCard).
+
+  import { PRESET_GROUPS as GROUPS, PRESET_NAMES as ALL_NAMES } from '../lib/presets.js';
 
   let { selected = $bindable([]), disabled = false } = $props();
-
-  const GROUPS = [
-    {
-      category: 'Website',
-      presets: [
-        { name: 'website_webp', label: 'WebP', dims: 'Original size' },
-        { name: 'website_avif', label: 'AVIF', dims: 'Original size' },
-      ],
-    },
-    {
-      category: 'Instagram',
-      presets: [
-        { name: 'instagram_square', label: 'Square', dims: '1080×1080' },
-        { name: 'instagram_portrait', label: 'Portrait', dims: '1080×1350' },
-      ],
-    },
-    {
-      category: 'LinkedIn',
-      presets: [{ name: 'linkedin', label: 'Post', dims: '1200×627' }],
-    },
-    {
-      category: 'Twitter / X',
-      presets: [{ name: 'twitter', label: 'Post', dims: '1200×675' }],
-    },
-    {
-      category: 'Open Graph',
-      presets: [{ name: 'og_image', label: 'OG image', dims: '1200×630' }],
-    },
-  ];
-
-  const ALL_NAMES = GROUPS.flatMap((g) => g.presets.map((p) => p.name));
 
   let allSelected = $derived(selected.length === ALL_NAMES.length);
 
