@@ -17,8 +17,9 @@ import (
 // `vips` tag, i.e. without libvips support compiled in.
 var ErrVipsNotBuilt = errors.New("processor: built without 'vips' tag; libvips unavailable")
 
-// Startup is a no-op in non-vips builds.
-func Startup() error { return nil }
+// Startup is a no-op in non-vips builds. The workers argument is accepted to
+// match the real signature but ignored, since no processing runs.
+func Startup(workers int) error { return nil }
 
 // Shutdown is a no-op in non-vips builds.
 func Shutdown() {}

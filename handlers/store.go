@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -45,6 +47,10 @@ type Job struct {
 	ID    string
 	store *Store
 
+	// createdAt is when the job was registered; the reaper uses it for TTL.
+	// It is set once at Create and never mutated, so it needs no lock.
+	createdAt time.Time
+
 	mu       sync.Mutex
 	total    int
 	done     int
@@ -56,30 +62,56 @@ type Job struct {
 }
 
 // Store is the in-memory job registry. No Redis, no disk: jobs live until their
-// ZIP is downloaded (or until the process exits).
+// ZIP is downloaded, until the reaper frees them after the TTL, or until the
+// process exits.
 type Store struct {
 	mu   sync.Mutex
 	jobs map[string]*Job
+
+	// now is the clock used for createdAt; tests override it to control TTL.
+	now func() time.Time
+
+	// wg tracks in-flight job goroutines so graceful shutdown can drain them.
+	wg sync.WaitGroup
 }
 
 // NewStore returns an empty job store.
 func NewStore() *Store {
-	return &Store{jobs: make(map[string]*Job)}
+	return &Store{
+		jobs: make(map[string]*Job),
+		now:  time.Now,
+	}
 }
 
 // Create registers a new job with the given total work-unit count and returns
 // it. total is len(files) * len(presets).
 func (s *Store) Create(total int) *Job {
 	j := &Job{
-		ID:     uuid.NewString(),
-		store:  s,
-		total:  total,
-		status: "processing",
+		ID:        uuid.NewString(),
+		store:     s,
+		createdAt: s.now(),
+		total:     total,
+		status:    "processing",
 	}
 	s.mu.Lock()
 	s.jobs[j.ID] = j
 	s.mu.Unlock()
 	return j
+}
+
+// Go runs fn in a tracked goroutine so Wait (used by graceful shutdown) can
+// block until every in-flight job has finished processing.
+func (s *Store) Go(fn func()) {
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		fn()
+	}()
+}
+
+// Wait blocks until all goroutines started via Go have returned.
+func (s *Store) Wait() {
+	s.wg.Wait()
 }
 
 // Get returns the job with the given ID.
@@ -95,6 +127,59 @@ func (s *Store) Delete(id string) {
 	s.mu.Lock()
 	delete(s.jobs, id)
 	s.mu.Unlock()
+}
+
+// StartReaper launches a background goroutine that periodically frees jobs whose
+// state has outlived ttl, bounding memory for jobs that are never downloaded.
+// All job state (including output bytes) is in memory, so dropping the map entry
+// is enough for GC to reclaim it — there are no temp files to unlink. The
+// goroutine exits when ctx is canceled (graceful shutdown). A non-positive ttl
+// disables reaping.
+func (s *Store) StartReaper(ctx context.Context, ttl time.Duration) {
+	if ttl <= 0 {
+		return
+	}
+	// Sweep often enough to honor the TTL without busy-looping: at most once a
+	// minute, or every ttl for very short TTLs (tests, tight deploys).
+	interval := ttl
+	if interval > time.Minute {
+		interval = time.Minute
+	}
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.reapExpired(ttl)
+			}
+		}
+	}()
+}
+
+// reapExpired deletes every job older than ttl. Reaped jobs still holding live
+// SSE subscribers are failed first so their subscriber channels close and the
+// SSE handlers return rather than leaking.
+func (s *Store) reapExpired(ttl time.Duration) {
+	cutoff := s.now().Add(-ttl)
+
+	s.mu.Lock()
+	var expired []*Job
+	for id, j := range s.jobs {
+		if j.createdAt.Before(cutoff) {
+			expired = append(expired, j)
+			delete(s.jobs, id)
+		}
+	}
+	s.mu.Unlock()
+
+	for _, j := range expired {
+		// Close any still-open subscriber channels (no-op if already finished).
+		j.Fail()
+		log.Printf("reaper: freed job %s (age > %s)", j.ID, ttl)
+	}
 }
 
 // Subscribe attaches an SSE consumer to a job. It returns a snapshot of every

@@ -23,8 +23,12 @@ var (
 	activeSem chan struct{}
 )
 
-func initSemaphores() {
-	n := runtime.NumCPU()
+// initSemaphores sizes the worker pool. n is the configured worker count
+// (WORKER_COUNT); a non-positive value falls back to runtime.NumCPU().
+func initSemaphores(n int) {
+	if n < 1 {
+		n = runtime.NumCPU()
+	}
 	if n < 1 {
 		n = 1
 	}

@@ -17,10 +17,6 @@ import (
 // errNoPresets is returned when an upload selects no valid presets.
 var errNoPresets = errors.New("no valid presets selected")
 
-// maxFileBytes is the per-file size cap (50 MB). The whole-request cap is set
-// separately via Fiber's BodyLimit in main.go.
-const maxFileBytes = 50 << 20
-
 // allowedExts is the set of input extensions we accept. It backstops content
 // sniffing, which does not reliably recognize AVIF.
 var allowedExts = map[string]bool{
@@ -42,8 +38,9 @@ var allowedSniffed = map[string]bool{
 // Upload handles POST /upload. It accepts multipart form-data with one or more
 // image files (field "files", or "file") and selected preset names (field
 // "presets", repeated or comma-separated), validates type and size, kicks off
-// asynchronous processing, and returns the job id immediately.
-func Upload(store *Store) fiber.Handler {
+// asynchronous processing, and returns the job id immediately. maxFileBytes is
+// the per-file size cap (from config); oversized files are rejected with 400.
+func Upload(store *Store, maxFileBytes int64) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		form, err := c.MultipartForm()
 		if err != nil {
@@ -65,7 +62,7 @@ func Upload(store *Store) fiber.Handler {
 
 		files := make([]srcFile, 0, len(headers))
 		for _, fh := range headers {
-			data, err := readValidImage(fh)
+			data, err := readValidImage(fh, maxFileBytes)
 			if err != nil {
 				return fiber.NewError(fiber.StatusBadRequest, err.Error())
 			}
@@ -76,7 +73,8 @@ func Upload(store *Store) fiber.Handler {
 		}
 
 		job := store.Create(len(files) * len(presets))
-		go runJob(job, files, presets)
+		// Track the goroutine so graceful shutdown can drain in-flight jobs.
+		store.Go(func() { runJob(job, files, presets) })
 
 		return c.JSON(fiber.Map{"jobId": job.ID})
 	}
@@ -110,9 +108,9 @@ func selectPresets(values []string) ([]processor.Preset, error) {
 // readValidImage enforces the size cap, reads the file into memory, and verifies
 // it is a supported image by content sniff OR extension (AVIF relies on the
 // latter, as the stdlib sniffer does not recognize it).
-func readValidImage(fh *multipart.FileHeader) ([]byte, error) {
+func readValidImage(fh *multipart.FileHeader, maxFileBytes int64) ([]byte, error) {
 	if fh.Size > maxFileBytes {
-		return nil, fmt.Errorf("%q exceeds 50MB limit", fh.Filename)
+		return nil, fmt.Errorf("%q exceeds the %dMB limit", fh.Filename, maxFileBytes>>20)
 	}
 	f, err := fh.Open()
 	if err != nil {
