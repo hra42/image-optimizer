@@ -339,6 +339,11 @@ func runJob(job *Job, files []srcFile, imagePresets, bundlePresets []processor.P
 						data:    r.Data,
 						pack:    r.Files,
 					})
+				} else {
+					// A single failed preset is non-fatal by design (the other
+					// presets/files still produce output), but log it so the
+					// silently-missing ZIP entry is at least diagnosable.
+					log.Printf("job %s: preset %q failed for %q: %v", job.ID, r.Preset.Name, f.base, r.Err)
 				}
 				job.publishLocked(progressEvent{
 					Job:    job.ID,
@@ -381,6 +386,12 @@ func runJob(job *Job, files []srcFile, imagePresets, bundlePresets []processor.P
 					bundle: true,
 					pack:   r.Files,
 				})
+			} else {
+				// A failed bundle (e.g. a corrupt page or PDF assembly error) is
+				// non-fatal so other selected presets still complete, but the
+				// requested PDF will be absent from the ZIP — log it rather than
+				// dropping it silently.
+				log.Printf("job %s: bundle preset %q failed: %v", job.ID, r.Preset.Name, r.Err)
 			}
 			job.publishLocked(progressEvent{
 				Job:    job.ID,
