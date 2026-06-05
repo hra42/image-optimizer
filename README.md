@@ -113,6 +113,7 @@ turning an iPhone HEIC straight into JPEG/PNG/WebP/AVIF without any other tool.
 | `png_original`       | PNG    | original    | compression 6                  |
 | `instagram_square`   | JPEG   | 1080×1080   | progressive                    |
 | `instagram_portrait` | JPEG   | 1080×1350   | progressive                    |
+| `instagram_story`    | JPEG   | 1080×1920   | progressive                    |
 | `linkedin`           | JPEG   | 1200×627    | progressive                    |
 | `twitter`            | JPEG   | 1200×675    | progressive                    |
 | `facebook_post`      | JPEG   | 1200×630    | progressive                    |
