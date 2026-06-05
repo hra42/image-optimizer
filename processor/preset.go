@@ -30,12 +30,17 @@ const (
 // KindDocumentPDF is a *bundle* kind: it consumes ALL uploaded files at once and
 // emits one multi-page PDF (each image a page, in upload order) — a LinkedIn
 // document/carousel post. Unlike the other kinds it is not per-file.
+// KindBackgroundRemove runs AI foreground segmentation (a U²-Net ONNX model) to
+// strip the background and emit a single transparent PNG. It is per-file like
+// KindImage, but its pipeline is the ONNX path (gated behind the `onnx` build
+// tag), not libvips — see processor/bg.go.
 type Kind int
 
 const (
 	KindImage Kind = iota
 	KindFaviconPack
 	KindDocumentPDF
+	KindBackgroundRemove
 )
 
 // Preset describes one output variant: target format, dimensions, and the
@@ -134,6 +139,12 @@ var presets = []Preset{
 	{Name: "favicon", Kind: KindFaviconPack, Format: FormatPNG, Compression: 6},
 	// thumbnail stays a single square PNG for anyone who just wants one icon.
 	{Name: "thumbnail", Format: FormatPNG, Width: 400, Height: 400, Compression: 6},
+
+	// Background removal: AI foreground segmentation (U²-Netp ONNX) emits the
+	// original image with a transparent background as a single PNG. Per-file like
+	// KindImage, but runs the ONNX path (onnx build tag) instead of libvips.
+	// Width/Height keep the source size; Format must be PNG (alpha).
+	{Name: "remove_bg", Kind: KindBackgroundRemove, Format: FormatPNG, Compression: 6},
 
 	// Wide JPEG banners.
 	{Name: "email_header", Format: FormatJPEG, Width: 600, Height: 200, Quality: 80, Progressive: true},
