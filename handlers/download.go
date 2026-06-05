@@ -33,6 +33,14 @@ func Download(store *Store) fiber.Handler {
 		return c.SendStreamWriter(func(w *bufio.Writer) {
 			zw := zip.NewWriter(w)
 			for _, of := range outputs {
+				// Pack presets (e.g. favicon) expand into a folder of members;
+				// normal presets are a single named entry.
+				if len(of.pack) > 0 {
+					if err := writePack(zw, of, multiSource); err != nil {
+						break
+					}
+					continue
+				}
 				name := of.preset + extFor(of.format)
 				if multiSource {
 					name = path.Join(of.srcBase, name)
@@ -53,6 +61,27 @@ func Download(store *Store) fiber.Handler {
 			store.Delete(jobID)
 		})
 	}
+}
+
+// writePack writes every member of a pack preset into the ZIP under a folder
+// named after the preset (e.g. "favicon/favicon.ico"). When the job has multiple
+// source files the folder is further namespaced by source base, mirroring the
+// single-file path. Any write error aborts the pack.
+func writePack(zw *zip.Writer, of outFile, multiSource bool) error {
+	dir := of.preset
+	if multiSource {
+		dir = path.Join(of.srcBase, of.preset)
+	}
+	for _, member := range of.pack {
+		fw, err := zw.Create(path.Join(dir, member.Name))
+		if err != nil {
+			return err
+		}
+		if _, err := fw.Write(member.Data); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // hasMultipleSources reports whether the outputs came from more than one source

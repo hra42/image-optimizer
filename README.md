@@ -1,11 +1,59 @@
 # Image Optimizer
 
-High-performance web image optimizer with multi-target presets (web, Instagram,
-LinkedIn, Twitter/X, OG images) built on **Fiber v3** + **govips (libvips)**.
+A fast, self-hostable web app that turns one image into every size and format you
+actually need — web formats, social media presets, and a complete favicon pack —
+and hands them back as a single ZIP.
 
-Accepts image uploads and outputs optimized variants for multiple targets. The
-Svelte SPA is compiled to static files and embedded directly into the Go binary,
-so the whole app ships as a single Docker container.
+Drop your images in the browser, tick the targets you want, and download the
+optimized results. No accounts, no uploads kept on disk, no setup beyond running
+one Docker container.
+
+![Optimize an image into multiple targets, then download a ZIP.](#)
+<!-- TODO: add a screenshot or short GIF of the app before going public -->
+
+## Why
+
+Preparing images for the web is repetitive: resize for Instagram, crop for an
+Open Graph card, generate a dozen favicon files, re-encode to WebP/AVIF for
+performance… usually across several tools. This does all of it in one drag-and-drop
+step, runs entirely on your own server, and never writes your images to disk.
+
+## Features
+
+- **Many targets at once** — pick any combination of presets; each image is
+  optimized for every selected target in parallel.
+- **Modern + classic formats** — outputs WebP, AVIF, JPEG (progressive), and PNG.
+- **Wide input support** — JPEG, PNG, WebP, AVIF, and iPhone **HEIC/HEIF**.
+- **Drop-in favicon pack** — one click produces `favicon.ico`, all the PNG sizes,
+  `apple-touch-icon`, `site.webmanifest`, and a ready-to-paste HTML snippet.
+- **Social presets** — Instagram, LinkedIn, X, Facebook, Pinterest, Open Graph,
+  plus email/web banners.
+- **Live progress** — per-target progress streamed over Server-Sent Events.
+- **Privacy by design** — images are processed in memory only and deleted right
+  after download (or after a short timeout); nothing is stored.
+- **Single container** — the Svelte UI is embedded into the Go binary, so the
+  whole app is one small Docker image with no external services.
+
+## How it works
+
+1. **Add images** — drag & drop or browse (JPEG, PNG, WebP, AVIF, HEIC).
+2. **Pick targets** — choose one or more presets.
+3. **Optimize** — each image is resized/re-encoded for every target; watch live
+   progress.
+4. **Download** — get a single ZIP with every optimized variant, named by preset.
+
+## Quick start
+
+Run the prebuilt-style image locally (only Docker required):
+
+```sh
+docker build -t image-optimizer .
+docker run -p 3000:3000 image-optimizer
+```
+
+Then open <http://localhost:3000> and start dropping images. See
+[Production image](#production-image) for deployment details and
+[Development](#development) for the hot-reload setup.
 
 ## Tech stack
 
@@ -30,6 +78,57 @@ so the whole app ships as a single Docker container.
 > **Note on `frontend/dist`:** a small stub `index.html` is committed so
 > `go build` works locally without first running Vite. The Docker frontend
 > stage overwrites it with the real Vite build.
+
+## Supported formats & presets
+
+**Input:** JPEG, PNG, WebP, AVIF, and HEIC/HEIF (iPhone photos). HEIC/HEIF are
+decoded via libvips' `heifload` (libheif/libde265, bundled in the Docker images).
+
+The **`convert_*` presets** are the "just turn this into a usable file" path:
+faithful, high-quality format conversion at the original size (no crop). Handy for
+turning an iPhone HEIC straight into JPEG/PNG/WebP/AVIF without any other tool.
+
+**Output presets** (registry: `processor/preset.go`):
+
+| Preset               | Format | Dimensions  | Notes                          |
+| -------------------- | ------ | ----------- | ------------------------------ |
+| `convert_jpeg`       | JPEG   | original    | quality 92, progressive — faithful conversion |
+| `convert_png`        | PNG    | original    | compression 6 (lossless)       |
+| `convert_webp`       | WebP   | original    | quality 90 — faithful conversion |
+| `convert_avif`       | AVIF   | original    | quality 80, effort 4 — faithful conversion |
+| `website_webp`       | WebP   | original    | quality 80 (web-optimized)     |
+| `website_avif`       | AVIF   | original    | quality 60, effort 4 (web-optimized) |
+| `jpeg_original`      | JPEG   | original    | quality 80, progressive        |
+| `png_original`       | PNG    | original    | compression 6                  |
+| `instagram_square`   | JPEG   | 1080×1080   | progressive                    |
+| `instagram_portrait` | JPEG   | 1080×1350   | progressive                    |
+| `linkedin`           | JPEG   | 1200×627    | progressive                    |
+| `twitter`            | JPEG   | 1200×675    | progressive                    |
+| `facebook_post`      | JPEG   | 1200×630    | progressive                    |
+| `pinterest_pin`      | JPEG   | 1000×1500   | progressive                    |
+| `og_image`           | PNG    | 1200×630    | compression 6                  |
+| `favicon`            | —      | —           | **favicon pack** (see below)   |
+| `thumbnail`          | PNG    | 400×400     | compression 6                  |
+| `email_header`       | JPEG   | 600×200     | progressive                    |
+| `web_banner`         | JPEG   | 1920×480    | progressive                    |
+
+Fixed-size presets center-crop to the target dimensions; `*_original` presets
+keep the source dimensions and just re-encode + strip metadata.
+
+### Favicon pack
+
+The `favicon` preset is a multi-file output: instead of one image it generates a
+complete drop-in icon set, bundled under a `favicon/` folder in the ZIP:
+
+- `favicon.ico` (multi-size 16/32/48, hand-built ICO container)
+- `favicon-16x16.png`, `favicon-32x32.png`, `favicon-48x48.png`
+- `apple-touch-icon.png` (180×180)
+- `android-chrome-192x192.png`, `android-chrome-512x512.png`
+- `site.webmanifest` and a `README.txt` with the exact `<head>` `<link>` snippet
+
+The pack is generated from a center-cropped square master. The multi-file plumbing
+lives in `Preset.Kind` / `Result.Files` (`processor/preset.go`,
+`processor/favicon_vips.go`, `processor/ico.go`).
 
 ## Development
 

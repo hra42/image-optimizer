@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go-stub:
+    name: Go test & vet (stub mode)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test (tag-free packages)
+        run: go test ./...
+
+  go-vips:
+    name: Go test & vet (vips)
+    runs-on: ubuntu-latest
+    # Run inside the same Debian bookworm + libvips source as the production
+    # Dockerfile builder stage. Debian's libvips ships an AV1 encoder, so AVIF
+    # presets encode correctly here — Ubuntu's apt libvips does not, and fails
+    # heifsave with "Unsupported compression".
+    container: golang:1.26-bookworm
+    steps:
+      - uses: actions/checkout@v4
+
+      # The checkout dir is owned by a different UID inside the container, so git
+      # refuses to read it and Go's VCS stamping (-buildvcs) fails. Mark it safe.
+      - name: Mark workspace as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install libvips
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends libvips-dev pkg-config
+          rm -rf /var/lib/apt/lists/*
+
+      - name: go vet (vips)
+        run: go vet -tags vips ./...
+
+      - name: go test (vips)
+        run: go test -tags vips ./...
+
+      - name: go build (vips)
+        run: CGO_ENABLED=1 go build -tags vips -o /dev/null .
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run build

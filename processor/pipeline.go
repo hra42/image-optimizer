@@ -13,6 +13,11 @@ import (
 // with the preset's tuned encoding params. Any failure is returned inside the
 // Result so the orchestrator can keep the other presets going.
 func processImage(buf []byte, p Preset) Result {
+	// Pack presets produce a set of files rather than a single image.
+	if p.Kind == KindFaviconPack {
+		return buildFaviconPack(buf, p)
+	}
+
 	res := Result{Preset: p}
 
 	var (

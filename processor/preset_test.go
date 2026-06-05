@@ -9,11 +9,23 @@ func TestAllPresetsMatchSpec(t *testing.T) {
 	want := map[string]Preset{
 		"website_webp":       {Name: "website_webp", Format: FormatWebP, Quality: 80},
 		"website_avif":       {Name: "website_avif", Format: FormatAVIF, Quality: 60, Effort: 4},
+		"jpeg_original":      {Name: "jpeg_original", Format: FormatJPEG, Quality: 80, Progressive: true},
+		"png_original":       {Name: "png_original", Format: FormatPNG, Compression: 6},
+		"convert_jpeg":       {Name: "convert_jpeg", Format: FormatJPEG, Quality: 92, Progressive: true},
+		"convert_png":        {Name: "convert_png", Format: FormatPNG, Compression: 6},
+		"convert_webp":       {Name: "convert_webp", Format: FormatWebP, Quality: 90},
+		"convert_avif":       {Name: "convert_avif", Format: FormatAVIF, Quality: 80, Effort: 4},
 		"instagram_square":   {Name: "instagram_square", Format: FormatJPEG, Width: 1080, Height: 1080, Quality: 80, Progressive: true},
 		"instagram_portrait": {Name: "instagram_portrait", Format: FormatJPEG, Width: 1080, Height: 1350, Quality: 80, Progressive: true},
 		"linkedin":           {Name: "linkedin", Format: FormatJPEG, Width: 1200, Height: 627, Quality: 80, Progressive: true},
 		"twitter":            {Name: "twitter", Format: FormatJPEG, Width: 1200, Height: 675, Quality: 80, Progressive: true},
+		"facebook_post":      {Name: "facebook_post", Format: FormatJPEG, Width: 1200, Height: 630, Quality: 80, Progressive: true},
+		"pinterest_pin":      {Name: "pinterest_pin", Format: FormatJPEG, Width: 1000, Height: 1500, Quality: 80, Progressive: true},
 		"og_image":           {Name: "og_image", Format: FormatPNG, Width: 1200, Height: 630, Compression: 6},
+		"favicon":            {Name: "favicon", Kind: KindFaviconPack, Format: FormatPNG, Compression: 6},
+		"thumbnail":          {Name: "thumbnail", Format: FormatPNG, Width: 400, Height: 400, Compression: 6},
+		"email_header":       {Name: "email_header", Format: FormatJPEG, Width: 600, Height: 200, Quality: 80, Progressive: true},
+		"web_banner":         {Name: "web_banner", Format: FormatJPEG, Width: 1920, Height: 480, Quality: 80, Progressive: true},
 	}
 
 	got := AllPresets()
