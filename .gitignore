@@ -7,6 +7,14 @@ image-optimizer
 frontend/node_modules/
 frontend/.vite/
 
+# Frontend build output. dist/ is produced by `npm run build` (and freshly by
+# Docker's frontend stage in prod). Only the committed stub index.html is kept
+# so `go build`'s //go:embed works locally without running Vite; everything else
+# Vite emits here (hashed JS/CSS bundles, copied public/ assets) is ignored.
+frontend/dist/*
+!frontend/dist/index.html
+
 # Env / local
 .env
+.env.*
 .DS_Store
