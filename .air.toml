@@ -1,0 +1,13 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/main ."
+  bin = "./tmp/main"
+  include_ext = ["go", "html"]
+  exclude_dir = ["tmp", "frontend/node_modules", "frontend/dist", ".git"]
+  delay = 1000
+  stop_on_error = true
+
+[misc]
+  clean_on_exit = true

@@ -1,0 +1,34 @@
+# Local development with hot-reload.
+#   backend  — Go via Air, rebuilds on .go changes, serves :3000
+#   frontend — Vite dev server with HMR, serves :5173
+#
+# In dev the two run separately. The production single-image build
+# (`docker build .`) embeds the Vite output into the Go binary instead.
+
+services:
+  backend:
+    image: golang:1.26-bookworm
+    working_dir: /app
+    command: sh -c "apt-get update && apt-get install -y --no-install-recommends libvips-dev pkg-config && go install github.com/air-verse/air@latest && air"
+    environment:
+      PORT: "3000"
+      CGO_ENABLED: "1"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - go-mod-cache:/go/pkg/mod
+
+  frontend:
+    image: node:22-slim
+    working_dir: /app/frontend
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app/frontend
+      - frontend-node-modules:/app/frontend/node_modules
+
+volumes:
+  go-mod-cache:
+  frontend-node-modules:

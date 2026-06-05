@@ -1,0 +1,7 @@
+.git
+tmp/
+frontend/node_modules
+frontend/dist
+*.md
+.air.toml
+docker-compose.yml

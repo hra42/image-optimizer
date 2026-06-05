@@ -1,0 +1,12 @@
+# Go
+/tmp/
+*.exe
+image-optimizer
+
+# Node
+frontend/node_modules/
+frontend/.vite/
+
+# Env / local
+.env
+.DS_Store

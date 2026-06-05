@@ -1,0 +1,5 @@
+node_modules/
+.vite/
+
+# dist/ is committed as a stub so `go build` works locally without running
+# Vite. The Docker frontend stage overwrites it with a real build.
