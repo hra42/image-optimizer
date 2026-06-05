@@ -32,4 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /app/image-optimizer /usr/local/bin/image-optimizer
 USER app
 EXPOSE 3000
+# The binary self-probes via -healthcheck (GET /health), so the minimal runtime
+# image needs no curl/wget.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD ["/usr/local/bin/image-optimizer", "-healthcheck"]
 ENTRYPOINT ["/usr/local/bin/image-optimizer"]

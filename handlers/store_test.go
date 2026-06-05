@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"sync"
 	"testing"
+	"time"
 )
 
 // drain reads every remaining event from a closed/closing channel.
@@ -150,4 +152,66 @@ func TestDeleteRemovesJob(t *testing.T) {
 	if _, ok := s.Get(job.ID); ok {
 		t.Fatal("expected job to be removed after Delete")
 	}
+}
+
+// TestReapExpiredRemovesOldKeepsFresh: a job older than the TTL is reaped while
+// a fresh one survives. The clock is injected via s.now so no sleeping is needed.
+func TestReapExpiredRemovesOldKeepsFresh(t *testing.T) {
+	base := time.Unix(1_700_000_000, 0)
+
+	s := NewStore()
+	s.now = func() time.Time { return base }
+	old := s.Create(1) // created "now"
+
+	// Advance the clock 11 minutes; a new job is created at the later time.
+	s.now = func() time.Time { return base.Add(11 * time.Minute) }
+	fresh := s.Create(1)
+
+	s.reapExpired(10 * time.Minute)
+
+	if _, ok := s.Get(old.ID); ok {
+		t.Error("expected job older than TTL to be reaped")
+	}
+	if _, ok := s.Get(fresh.ID); !ok {
+		t.Error("expected fresh job to survive reaping")
+	}
+}
+
+// TestReapExpiredClosesSubscribers: reaping a job that still has a live SSE
+// subscriber must close its channel so the SSE handler returns rather than leak.
+func TestReapExpiredClosesSubscribers(t *testing.T) {
+	base := time.Unix(1_700_000_000, 0)
+
+	s := NewStore()
+	s.now = func() time.Time { return base }
+	job := s.Create(1)
+
+	_, ch, _, ok := s.Subscribe(job.ID)
+	if !ok || ch == nil {
+		t.Fatal("Subscribe failed to return a live channel")
+	}
+
+	s.now = func() time.Time { return base.Add(time.Hour) }
+	s.reapExpired(10 * time.Minute)
+
+	// Channel must be closed (drain returns once the range ends).
+	done := make(chan struct{})
+	go func() { drain(ch); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("subscriber channel was not closed by the reaper")
+	}
+}
+
+// TestStartReaperStopsOnContextCancel: the reaper goroutine exits when its
+// context is canceled, so graceful shutdown does not leak it.
+func TestStartReaperStopsOnContextCancel(t *testing.T) {
+	s := NewStore()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.StartReaper(ctx, time.Minute)
+	cancel()
+	// Nothing to assert beyond not hanging/panicking; the goroutine returns on
+	// ctx.Done(). A short wait gives the race detector a window to flag misuse.
+	time.Sleep(10 * time.Millisecond)
 }

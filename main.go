@@ -1,14 +1,21 @@
 package main
 
 import (
+	"context"
 	"embed"
+	"flag"
 	"io/fs"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/static"
 
+	"github.com/hra42/image-optimizer/config"
 	"github.com/hra42/image-optimizer/handlers"
 	"github.com/hra42/image-optimizer/processor"
 )
@@ -20,26 +27,40 @@ import (
 //go:embed all:frontend/dist
 var frontendDist embed.FS
 
-// maxUploadBytes caps the whole multipart request body. Fiber v3 defaults to
-// 4 MB; uploads carry up to several 50 MB images, so the limit is raised to give
-// headroom for multiple files plus multipart boundaries. Per-file 50 MB
-// enforcement lives in the upload handler.
-const maxUploadBytes = 64 << 20
+// shutdownGrace bounds each phase of graceful shutdown: how long Fiber waits for
+// open connections to close, and how long we wait for in-flight jobs to drain.
+const shutdownGrace = 30 * time.Second
 
 func main() {
+	// -healthcheck turns the binary into its own health probe (used by the
+	// Docker HEALTHCHECK so the minimal runtime image needs no curl/wget).
+	healthcheck := flag.Bool("healthcheck", false, "probe GET /health and exit 0/1")
+	flag.Parse()
+	if *healthcheck {
+		os.Exit(runHealthcheck())
+	}
+
+	cfg := config.Load()
+
 	app := fiber.New(fiber.Config{
-		BodyLimit: maxUploadBytes,
+		BodyLimit: int(cfg.MaxUploadBytes),
 	})
 
-	// Initialize libvips (real config in vips builds; no-op otherwise).
-	if err := processor.Startup(); err != nil {
+	// Initialize libvips (real config in vips builds; no-op otherwise). Worker
+	// count is configurable via WORKER_COUNT; <=0 falls back to NumCPU.
+	if err := processor.Startup(cfg.Workers); err != nil {
 		log.Fatalf("processor startup: %v", err)
 	}
-	defer processor.Shutdown()
+
+	// Root context canceled on SIGINT/SIGTERM; drives the reaper and shutdown.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	// API routes (health, upload, progress SSE, download). Registered before the
-	// SPA catch-all so they are not swallowed by the wildcard route.
-	handlers.RegisterRoutes(app)
+	// SPA catch-all so they are not swallowed by the wildcard route. The returned
+	// store owns job lifecycle; start its TTL reaper and drain it on shutdown.
+	store := handlers.RegisterRoutes(app, cfg.MaxFileBytes)
+	store.StartReaper(ctx, cfg.JobTTL)
 
 	// Serve the embedded Svelte SPA at the root.
 	dist, err := fs.Sub(frontendDist, "frontend/dist")
@@ -51,13 +72,74 @@ func main() {
 		Browse: false,
 	}))
 
+	// Serve in a goroutine so main can wait for a shutdown signal.
+	serveErr := make(chan error, 1)
+	go func() {
+		log.Printf("listening on :%s", cfg.Port)
+		serveErr <- app.Listen(":" + cfg.Port)
+	}()
+
+	select {
+	case err := <-serveErr:
+		// Listener failed to start (e.g. port in use).
+		processor.Shutdown()
+		log.Fatalf("server error: %v", err)
+	case <-ctx.Done():
+		log.Println("shutdown: signal received, draining")
+	}
+
+	// 1. Stop accepting new connections, letting open ones finish.
+	if err := app.ShutdownWithTimeout(shutdownGrace); err != nil {
+		log.Printf("shutdown: server stop: %v", err)
+	}
+
+	// 2. Wait for in-flight jobs to finish processing (bounded) so their SSE
+	//    clients get a terminal event and the ZIP stays briefly downloadable.
+	if waitWithTimeout(store.Wait, shutdownGrace) {
+		log.Println("shutdown: in-flight jobs drained")
+	} else {
+		log.Printf("shutdown: drain timed out after %s, exiting anyway", shutdownGrace)
+	}
+
+	// 3. Tear down libvips.
+	processor.Shutdown()
+	log.Println("shutdown: complete")
+}
+
+// waitWithTimeout runs wait (a blocking call) and reports whether it returned
+// before the timeout.
+func waitWithTimeout(wait func(), timeout time.Duration) bool {
+	done := make(chan struct{})
+	go func() {
+		wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+// runHealthcheck performs a single GET /health against the local server and
+// returns a process exit code (0 healthy, 1 otherwise). It honors PORT so it
+// targets the same port the server listens on.
+func runHealthcheck() int {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
-
-	log.Printf("listening on :%s", port)
-	if err := app.Listen(":" + port); err != nil {
-		log.Fatalf("server error: %v", err)
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/health")
+	if err != nil {
+		log.Printf("healthcheck: %v", err)
+		return 1
 	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("healthcheck: status %d", resp.StatusCode)
+		return 1
+	}
+	return 0
 }

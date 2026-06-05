@@ -18,9 +18,10 @@ so the whole app ships as a single Docker container.
 
 ```
 .
-├── main.go            # Fiber app, /health, embeds frontend/dist
-├── handlers/          # HTTP handlers (health, and later: upload/progress/download)
-├── processor/         # govips pipeline (HRA-163)
+├── main.go            # Fiber app, config, graceful shutdown, embeds frontend/dist
+├── config/            # env-var configuration (port, limits, workers, job TTL)
+├── handlers/          # HTTP handlers: health, upload, progress (SSE), download
+├── processor/         # govips pipeline, worker semaphore, presets
 ├── frontend/          # Svelte + Vite app; dist/ is the go:embed target
 ├── Dockerfile         # 3-stage build: Vite → Go (cgo+libvips) → debian-slim
 └── docker-compose.yml # local dev with hot-reload
@@ -28,7 +29,7 @@ so the whole app ships as a single Docker container.
 
 > **Note on `frontend/dist`:** a small stub `index.html` is committed so
 > `go build` works locally without first running Vite. The Docker frontend
-> stage overwrites it with a real Vite build. The real UI lands in HRA-165.
+> stage overwrites it with the real Vite build.
 
 ## Development
 
@@ -51,8 +52,52 @@ docker run -p 3000:3000 image-optimizer
 curl http://localhost:3000/health   # -> 200 {"status":"ok"}
 ```
 
+The final image contains only the Go binary plus the libvips runtime libs
+(`libvips42`) on `debian:bookworm-slim`, and runs as a non-root user.
+
+### Health check
+
+The image ships a Docker `HEALTHCHECK` that probes `GET /health`. The binary
+self-probes via its `-healthcheck` flag, so no `curl`/`wget` is needed in the
+minimal runtime image:
+
+```sh
+docker run -d -p 3000:3000 image-optimizer
+docker ps   # STATUS shows "healthy" once the start period elapses
+```
+
+### Graceful shutdown
+
+On `SIGINT`/`SIGTERM` the server stops accepting new connections, drains
+in-flight jobs (so their SSE clients receive a terminal event and the ZIP stays
+briefly downloadable), tears down libvips, then exits. Each phase is bounded by a
+30s timeout so shutdown never hangs.
+
+### Job lifetime
+
+Job state lives in memory only — there is no disk temp storage. A job is freed
+when its ZIP is downloaded, or by a background reaper after `JOB_TTL_MINUTES`
+(default 10), whichever comes first. This bounds memory for jobs that are never
+downloaded.
+
+## Environment variables
+
+All configuration is via environment variables, read once at startup (the
+resolved values are logged). Invalid or non-positive numeric values fall back to
+the default rather than failing startup.
+
+| Variable           | Default          | Description                                                        |
+| ------------------ | ---------------- | ------------------------------------------------------------------ |
+| `PORT`             | `3000`           | TCP port the HTTP server listens on.                               |
+| `MAX_FILE_SIZE_MB` | `50`             | Per-file upload cap. Larger files are rejected with `400`.         |
+| `WORKER_COUNT`     | number of CPUs   | Max concurrent libvips pipelines (the real concurrency limit).     |
+| `JOB_TTL_MINUTES`  | `10`             | How long a job's in-memory state is retained before the reaper frees it. |
+
+The whole-request multipart body limit is derived from `MAX_FILE_SIZE_MB` plus
+headroom for multiple files and multipart boundaries.
+
 ## Requirements
 
-- Go 1.25+ · Node 22+ · Docker
+- Go 1.26+ · Node 22+ · Docker
 - libvips ≥ 8.14 (provided inside the Docker images; install locally only if
   building the Go binary outside Docker)
