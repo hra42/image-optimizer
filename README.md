@@ -1,15 +1,26 @@
-# Image Optimizer
+<h1 align="center">Image Optimizer</h1>
 
-A fast, self-hostable web app that turns one image into every size and format you
-actually need — web formats, social media presets, and a complete favicon pack —
-and hands them back as a single ZIP.
+<p align="center">
+  A fast, self-hostable web app that turns one image into every size and format
+  you actually need — web formats, social media presets, and a complete favicon
+  pack — and hands them back as a single ZIP.
+</p>
+
+<p align="center">
+  <a href="https://img.hra42.com">
+    <img src="https://img.shields.io/badge/▶%20Try%20the%20live%20demo-img.hra42.com-7c3aed?style=for-the-badge&logo=svelte&logoColor=white" alt="Try the live demo at img.hra42.com">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://img.hra42.com">
+    <img src="images/screenshot.png" alt="Optimize an image into multiple targets, then download a ZIP." width="800">
+  </a>
+</p>
 
 Drop your images in the browser, tick the targets you want, and download the
 optimized results. No accounts, no uploads kept on disk, no setup beyond running
 one Docker container.
-
-![Optimize an image into multiple targets, then download a ZIP.](#)
-<!-- TODO: add a screenshot or short GIF of the app before going public -->
 
 ## Why
 
