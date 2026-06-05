@@ -211,3 +211,8 @@ headroom for multiple files and multipart boundaries.
 - Go 1.26+ · Node 22+ · Docker
 - libvips ≥ 8.14 (provided inside the Docker images; install locally only if
   building the Go binary outside Docker)
+
+## License
+
+Released into the public domain under [The Unlicense](LICENSE) — do whatever you
+want with it.
