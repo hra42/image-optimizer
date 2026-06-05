@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go test & vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      # libvips dev headers so the vips-tagged tests/build link against libvips.
+      - name: Install libvips
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libvips-dev pkg-config
+
+      - name: go vet (stub mode)
+        run: go vet ./...
+
+      - name: go test (stub mode, tag-free packages)
+        run: go test ./...
+
+      - name: go vet (vips)
+        run: go vet -tags vips ./...
+
+      - name: go test (vips)
+        run: go test -tags vips ./...
+
+      - name: go build (vips)
+        run: CGO_ENABLED=1 go build -tags vips -o /dev/null .
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
