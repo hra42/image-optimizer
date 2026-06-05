@@ -39,11 +39,27 @@ func makeSourcePNG(t *testing.T, w, h int) []byte {
 	return buf.Bytes()
 }
 
+// nonBundlePresets returns the registry minus bundle presets (document PDFs),
+// mirroring how the upload handler partitions them away from the per-file
+// Process path.
+func nonBundlePresets() []Preset {
+	var out []Preset
+	for _, p := range AllPresets() {
+		if !p.IsBundle() {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func TestProcessAllPresets(t *testing.T) {
 	const srcW, srcH = 2000, 1500
 	src := makeSourcePNG(t, srcW, srcH)
 
-	presets := AllPresets()
+	// Bundle presets (document PDFs) consume all files at once and go through
+	// ProcessBundle, not the per-file Process path — the handler partitions them
+	// out, so mirror that here and cover them in TestProcessBundleDocumentPDF.
+	presets := nonBundlePresets()
 	results, err := Process(context.Background(), src, presets)
 	if err != nil {
 		t.Fatalf("Process returned error: %v", err)
@@ -164,7 +180,8 @@ func TestProcessSVGInput(t *testing.T) {
 		t.Fatal("isSVG did not recognize the SVG source")
 	}
 
-	results, err := Process(context.Background(), src, AllPresets())
+	// Bundle presets go through ProcessBundle, not the per-file Process path.
+	results, err := Process(context.Background(), src, nonBundlePresets())
 	if err != nil {
 		t.Fatalf("Process returned error: %v", err)
 	}
@@ -207,5 +224,69 @@ func TestProcessContextCancel(t *testing.T) {
 	_, err := Process(ctx, src, AllPresets())
 	if err == nil {
 		t.Error("Process with a cancelled context returned nil error, want context.Canceled")
+	}
+}
+
+// TestRenderDocumentPage verifies one source buffer is centre-cropped to the
+// preset's per-page box and encoded as JPEG.
+func TestRenderDocumentPage(t *testing.T) {
+	p, _ := PresetByName("linkedin_doc_portrait")
+	src := makeSourcePNG(t, 2000, 1500)
+
+	page, err := renderDocumentPage(src, p)
+	if err != nil {
+		t.Fatalf("renderDocumentPage: %v", err)
+	}
+	if page.wPx != p.Width || page.hPx != p.Height {
+		t.Errorf("page is %dx%d, want %dx%d", page.wPx, page.hPx, p.Width, p.Height)
+	}
+	if page.format != FormatJPEG {
+		t.Errorf("page format = %q, want jpeg", page.format)
+	}
+	img, err := vips.NewImageFromBuffer(page.data)
+	if err != nil {
+		t.Fatalf("page data failed to decode: %v", err)
+	}
+	defer img.Close()
+	if img.Width() != p.Width || img.Height() != p.Height {
+		t.Errorf("decoded page %dx%d, want %dx%d", img.Width(), img.Height(), p.Width, p.Height)
+	}
+}
+
+// TestProcessBundleDocumentPDF runs the full bundle path over several sources
+// and asserts a single multi-page PDF comes back, named after the preset.
+func TestProcessBundleDocumentPDF(t *testing.T) {
+	p, _ := PresetByName("linkedin_doc_portrait")
+	bufs := [][]byte{
+		makeSourcePNG(t, 1600, 1200),
+		makeSourcePNG(t, 800, 800),
+		makeSourcePNG(t, 1000, 2000),
+	}
+
+	r := ProcessBundle(context.Background(), bufs, p)
+	if r.Err != nil {
+		t.Fatalf("ProcessBundle: %v", r.Err)
+	}
+	if len(r.Files) != 1 {
+		t.Fatalf("got %d files, want 1", len(r.Files))
+	}
+	f := r.Files[0]
+	if f.Name != "linkedin_doc_portrait.pdf" {
+		t.Errorf("file name = %q, want linkedin_doc_portrait.pdf", f.Name)
+	}
+	if !bytes.HasPrefix(f.Data, []byte("%PDF-")) {
+		t.Error("bundle output is not a PDF (missing %PDF- magic)")
+	}
+}
+
+// TestProcessBundleCancel verifies a cancelled context aborts the bundle.
+func TestProcessBundleCancel(t *testing.T) {
+	p, _ := PresetByName("linkedin_doc_square")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	r := ProcessBundle(ctx, [][]byte{makeSourcePNG(t, 400, 400)}, p)
+	if r.Err == nil {
+		t.Error("ProcessBundle with a cancelled context returned nil Err, want context.Canceled")
 	}
 }

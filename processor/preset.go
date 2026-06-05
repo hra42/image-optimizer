@@ -4,6 +4,14 @@ package processor
 // compiles and its tests run locally without libvips installed. The govips
 // pipeline that consumes these presets lives in the `//go:build vips` files.
 
+import "errors"
+
+// ErrVipsNotBuilt is returned (directly, or via Result.Err for ProcessBundle)
+// when the binary was built without the `vips` tag, i.e. without libvips support
+// compiled in. Declared here (tag-free) so both the real and stub pipelines —
+// and the handlers that branch on it — reference the same value in every build.
+var ErrVipsNotBuilt = errors.New("processor: built without 'vips' tag; libvips unavailable")
+
 // Format is the output container/codec for a preset. It is a local type (not
 // vips.ImageType) precisely so this file stays free of the govips import.
 type Format string
@@ -19,11 +27,15 @@ const (
 // value) is the normal one-image-out path. KindFaviconPack produces a whole set
 // of files (multiple PNG sizes, an .ico, a web manifest, an HTML snippet) bundled
 // under a folder in the ZIP, so a single preset can yield a drop-in favicon pack.
+// KindDocumentPDF is a *bundle* kind: it consumes ALL uploaded files at once and
+// emits one multi-page PDF (each image a page, in upload order) — a LinkedIn
+// document/carousel post. Unlike the other kinds it is not per-file.
 type Kind int
 
 const (
 	KindImage Kind = iota
 	KindFaviconPack
+	KindDocumentPDF
 )
 
 // Preset describes one output variant: target format, dimensions, and the
@@ -45,6 +57,15 @@ type Preset struct {
 // pipeline keeps the source dimensions.
 func (p Preset) Resizes() bool {
 	return p.Width > 0 && p.Height > 0
+}
+
+// IsBundle reports whether the preset consumes ALL uploaded files at once and
+// produces a single output for the whole job (rather than running per-file).
+// Bundle presets take a separate path through the orchestrator (see runJob's
+// bundle phase) and their output is a top-level ZIP entry, not namespaced per
+// source. Mirror of the frontend BUNDLE_PRESETS set in frontend/src/lib/presets.js.
+func (p Preset) IsBundle() bool {
+	return p.Kind == KindDocumentPDF
 }
 
 // OutputFile is one named file inside a multi-file preset (e.g. a favicon pack
@@ -97,6 +118,8 @@ var presets = []Preset{
 	{Name: "instagram_square", Format: FormatJPEG, Width: 1080, Height: 1080, Quality: 80, Progressive: true},
 	{Name: "instagram_portrait", Format: FormatJPEG, Width: 1080, Height: 1350, Quality: 80, Progressive: true},
 	{Name: "linkedin", Format: FormatJPEG, Width: 1200, Height: 627, Quality: 80, Progressive: true},
+	{Name: "linkedin_profile_banner", Format: FormatJPEG, Width: 1584, Height: 396, Quality: 80, Progressive: true},
+	{Name: "linkedin_company_banner", Format: FormatJPEG, Width: 1128, Height: 191, Quality: 80, Progressive: true},
 	{Name: "twitter", Format: FormatJPEG, Width: 1200, Height: 675, Quality: 80, Progressive: true},
 	{Name: "facebook_post", Format: FormatJPEG, Width: 1200, Height: 630, Quality: 80, Progressive: true},
 	{Name: "pinterest_pin", Format: FormatJPEG, Width: 1000, Height: 1500, Quality: 80, Progressive: true},
@@ -114,6 +137,14 @@ var presets = []Preset{
 	// Wide JPEG banners.
 	{Name: "email_header", Format: FormatJPEG, Width: 600, Height: 200, Quality: 80, Progressive: true},
 	{Name: "web_banner", Format: FormatJPEG, Width: 1920, Height: 480, Quality: 80, Progressive: true},
+
+	// Document posts: bundle presets (KindDocumentPDF) — every uploaded image
+	// becomes one page of a single multi-page PDF, in upload order. This is the
+	// LinkedIn "document post" / carousel shape. Width/Height are the per-page
+	// box each image is centre-cropped to; Format must be JPEG (the only codec
+	// the PDF assembler embeds, see processor/pdf.go).
+	{Name: "linkedin_doc_portrait", Kind: KindDocumentPDF, Format: FormatJPEG, Width: 1080, Height: 1350, Quality: 85, Progressive: true},
+	{Name: "linkedin_doc_square", Kind: KindDocumentPDF, Format: FormatJPEG, Width: 1080, Height: 1080, Quality: 85, Progressive: true},
 }
 
 // AllPresets returns a copy of the full preset registry.

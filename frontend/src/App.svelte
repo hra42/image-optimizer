@@ -10,6 +10,7 @@
   import HowItWorks from './components/HowItWorks.svelte';
   import LegalModal from './components/LegalModal.svelte';
   import { createProgress } from './stores/progress.svelte.js';
+  import { BUNDLE_PRESETS } from './lib/presets.js';
 
   const progress = createProgress();
 
@@ -26,7 +27,7 @@
   async function submit() {
     if (!canSubmit) return;
 
-    progress.start(selectedPresets, files.length);
+    progress.start(selectedPresets, files.length, BUNDLE_PRESETS);
 
     const form = new FormData();
     for (const entry of files) form.append('files', entry.file);

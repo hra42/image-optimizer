@@ -33,6 +33,15 @@ func Download(store *Store) fiber.Handler {
 		return c.SendStreamWriter(func(w *bufio.Writer) {
 			zw := zip.NewWriter(w)
 			for _, of := range outputs {
+				// Bundle outputs (e.g. a document PDF) are written at the ZIP
+				// root using the member's own filename — never namespaced by
+				// source or preset folder.
+				if of.bundle {
+					if err := writeBundle(zw, of); err != nil {
+						break
+					}
+					continue
+				}
 				// Pack presets (e.g. favicon) expand into a folder of members;
 				// normal presets are a single named entry.
 				if len(of.pack) > 0 {
@@ -84,14 +93,39 @@ func writePack(zw *zip.Writer, of outFile, multiSource bool) error {
 	return nil
 }
 
-// hasMultipleSources reports whether the outputs came from more than one source
-// file, which determines whether ZIP entries are namespaced by source.
-func hasMultipleSources(outputs []outFile) bool {
-	if len(outputs) == 0 {
-		return false
+// writeBundle writes a bundle output's single member at the ZIP root, using the
+// member's own filename verbatim (e.g. "linkedin_doc_portrait.pdf"). Bundle
+// outputs are job-wide, so they are never namespaced by source. Any write error
+// aborts the bundle.
+func writeBundle(zw *zip.Writer, of outFile) error {
+	for _, member := range of.pack {
+		fw, err := zw.Create(member.Name)
+		if err != nil {
+			return err
+		}
+		if _, err := fw.Write(member.Data); err != nil {
+			return err
+		}
 	}
-	first := outputs[0].srcBase
-	for _, of := range outputs[1:] {
+	return nil
+}
+
+// hasMultipleSources reports whether the outputs came from more than one source
+// file, which determines whether ZIP entries are namespaced by source. Bundle
+// outputs are job-wide (empty srcBase) and are excluded — otherwise their empty
+// source would always register as a distinct source and force namespacing.
+func hasMultipleSources(outputs []outFile) bool {
+	var first string
+	seen := false
+	for _, of := range outputs {
+		if of.bundle {
+			continue
+		}
+		if !seen {
+			first = of.srcBase
+			seen = true
+			continue
+		}
 		if of.srcBase != first {
 			return true
 		}

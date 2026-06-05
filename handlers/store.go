@@ -34,6 +34,10 @@ type outFile struct {
 	format  processor.Format
 	data    []byte
 	pack    []processor.OutputFile
+	// bundle marks an all-files-in-one output (a document PDF). Its pack member
+	// name is the full filename and it is written at the ZIP root — never
+	// namespaced by source — so srcBase is left empty.
+	bundle bool
 }
 
 // srcFile is one uploaded image held in memory while its job runs.
@@ -309,14 +313,17 @@ func (j *Job) Finished() bool {
 	return j.finished
 }
 
-// runJob processes every file through every preset, streaming a progress event
-// per completed (file, preset) unit, then finishes the job. It runs in its own
+// runJob processes a job in two phases: a per-file phase that runs each file
+// through every per-image preset (one progress unit per (file, preset) pair),
+// then a bundle phase that runs each bundle preset (e.g. a document PDF) once
+// over ALL files (one progress unit per bundle preset). It runs in its own
 // goroutine off the upload request and therefore uses context.Background(): the
 // request context is canceled the moment the upload handler returns.
-func runJob(job *Job, files []srcFile, presets []processor.Preset) {
+func runJob(job *Job, files []srcFile, imagePresets, bundlePresets []processor.Preset) {
+	// --- Per-file phase: each file through every per-image preset. ---
 	for _, f := range files {
 		f := f
-		_, err := processor.ProcessStream(context.Background(), f.data, presets,
+		_, err := processor.ProcessStream(context.Background(), f.data, imagePresets,
 			func(_ int, r processor.Result) {
 				job.mu.Lock()
 				job.done++
@@ -348,5 +355,42 @@ func runJob(job *Job, files []srcFile, presets []processor.Preset) {
 			return
 		}
 	}
+
+	// --- Bundle phase: each bundle preset consumes ALL files once, in upload
+	// order, and emits one top-level output (e.g. a multi-page PDF). ---
+	if len(bundlePresets) > 0 {
+		bufs := make([][]byte, len(files))
+		for i, f := range files {
+			bufs[i] = f.data // files is already in upload order; page order follows
+		}
+		for _, p := range bundlePresets {
+			r := processor.ProcessBundle(context.Background(), bufs, p)
+			if r.Err == processor.ErrVipsNotBuilt {
+				job.Fail()
+				return
+			}
+			job.mu.Lock()
+			job.done++
+			pct := 100
+			if job.total > 0 {
+				pct = job.done * 100 / job.total
+			}
+			if r.Err == nil {
+				job.outputs = append(job.outputs, outFile{
+					preset: r.Preset.Name,
+					bundle: true,
+					pack:   r.Files,
+				})
+			}
+			job.publishLocked(progressEvent{
+				Job:    job.ID,
+				Preset: r.Preset.Name,
+				Pct:    pct,
+				Status: "processing",
+			})
+			job.mu.Unlock()
+		}
+	}
+
 	job.Finish("/download/" + job.ID)
 }
