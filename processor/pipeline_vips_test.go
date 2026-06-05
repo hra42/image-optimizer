@@ -144,6 +144,61 @@ func assertFaviconPack(t *testing.T, r Result) {
 	}
 }
 
+// svgSource is a minimal vector document whose intrinsic size is a small
+// 64×64. Without the density bump, the "keep original size" presets would
+// rasterize it at ~64px; with svgRasterDensity (4×) they should land far larger.
+const svgSource = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#1e1e2e"/>
+  <circle cx="32" cy="32" r="24" fill="#89b4fa"/>
+</svg>`
+
+// TestProcessSVGInput verifies SVG input flows through every preset: resize
+// presets render the vector straight to their exact target dimensions, and the
+// "keep original size" presets rasterize at the bumped density so the output is
+// a usable size rather than the SVG's tiny intrinsic dimensions.
+func TestProcessSVGInput(t *testing.T) {
+	src := []byte(svgSource)
+
+	if !isSVG(src) {
+		t.Fatal("isSVG did not recognize the SVG source")
+	}
+
+	results, err := Process(context.Background(), src, AllPresets())
+	if err != nil {
+		t.Fatalf("Process returned error: %v", err)
+	}
+
+	for _, r := range results {
+		if r.Err != nil {
+			t.Errorf("preset %q failed on SVG input: %v", r.Preset.Name, r.Err)
+			continue
+		}
+		if r.Preset.Kind == KindFaviconPack {
+			assertFaviconPack(t, r)
+			continue
+		}
+		if len(r.Data) == 0 {
+			t.Errorf("preset %q produced empty output", r.Preset.Name)
+			continue
+		}
+
+		if r.Preset.Resizes() {
+			// Vector source rendered straight to the target box.
+			if r.Width != r.Preset.Width || r.Height != r.Preset.Height {
+				t.Errorf("preset %q reported %dx%d, want %dx%d", r.Preset.Name, r.Width, r.Height, r.Preset.Width, r.Preset.Height)
+			}
+			continue
+		}
+
+		// Density-bumped render: a 64px-wide SVG at 4× density should produce
+		// noticeably more than its intrinsic size.
+		if r.Width <= 64 {
+			t.Errorf("preset %q rendered SVG at %dx%d — density bump did not apply", r.Preset.Name, r.Width, r.Height)
+		}
+	}
+}
+
 func TestProcessContextCancel(t *testing.T) {
 	src := makeSourcePNG(t, 800, 600)
 	ctx, cancel := context.WithCancel(context.Background())

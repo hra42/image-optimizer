@@ -9,7 +9,7 @@
     {
       n: 1,
       title: 'Add images',
-      body: 'Drag & drop or browse. JPEG, PNG, WebP, AVIF, and iPhone HEIC are all supported. Add as many as you like.',
+      body: 'Drag & drop or browse. JPEG, PNG, WebP, AVIF, SVG, and iPhone HEIC are all supported. Add as many as you like.',
       badge: 'from-ctp-mauve to-ctp-pink',
     },
     {

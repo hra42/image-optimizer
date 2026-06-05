@@ -24,12 +24,21 @@ func processImage(buf []byte, p Preset) Result {
 		img *vips.ImageRef
 		err error
 	)
-	if p.Resizes() {
+	switch {
+	case p.Resizes():
 		// Crop-to-fill at exact dimensions. The thumbnail path shrinks with
 		// Lanczos3 internally and guarantees an exact Width×Height via a centre
 		// crop (SizeBoth lets it both up- and down-scale to hit the target box).
+		// For SVG input this renders the vector source straight to the target
+		// raster size, so the result stays crisp.
 		img, err = vips.NewThumbnailWithSizeFromBuffer(buf, p.Width, p.Height, vips.InterestingCentre, vips.SizeBoth)
-	} else {
+	case isSVG(buf):
+		// "Keep original size" presets have no target dimensions, but SVG is
+		// vector — libvips would otherwise rasterize at the document's intrinsic
+		// size, which for icon SVGs is often tiny. Render at a higher density so
+		// the output is a usable size while preserving the author's proportions.
+		img, err = loadSVGAtDensity(buf, svgRasterDensity)
+	default:
 		// website_* presets keep the source dimensions.
 		img, err = vips.NewImageFromBuffer(buf)
 	}
@@ -56,6 +65,26 @@ func processImage(buf []byte, p Preset) Result {
 	res.Width = img.Width()
 	res.Height = img.Height()
 	return res
+}
+
+// svgRasterDensity is the DPI used to rasterize SVG input for "keep original
+// size" presets. librsvg's default is 72 DPI; 288 is a 4× bump, which turns a
+// nominally 256px-wide SVG into ~1024px of crisp raster while preserving the
+// SVG author's intended proportions.
+const svgRasterDensity = 288
+
+// isSVG reports whether buf is an SVG document, reusing govips' detection so we
+// match exactly what the loader would dispatch to vips_svgload.
+func isSVG(buf []byte) bool {
+	return vips.DetermineImageType(buf) == vips.ImageTypeSVG
+}
+
+// loadSVGAtDensity rasterizes an SVG buffer at the given DPI. Non-SVG callers
+// should not reach this — it sets the svgload-specific dpi import option.
+func loadSVGAtDensity(buf []byte, density int) (*vips.ImageRef, error) {
+	params := vips.NewImportParams()
+	params.Density.Set(density)
+	return vips.LoadImageFromBuffer(buf, params)
 }
 
 // export encodes the image into the preset's format with its tuned parameters.
