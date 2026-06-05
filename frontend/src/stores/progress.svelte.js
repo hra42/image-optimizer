@@ -11,6 +11,11 @@
 // finished. There is no per-preset percentage on the wire, so a preset's own
 // progress is derived from how many of its expected events have arrived:
 // expected = fileCount, completed bumps once per `processing` event for it.
+//
+// Bundle presets (document PDFs) are the exception: they consume ALL files at
+// once and emit exactly ONE `processing` event, so their expected = 1, not
+// fileCount. The caller passes the bundle set (see BUNDLE_PRESETS in
+// lib/presets.js) into start().
 
 export function createProgress() {
   // 'idle' | 'uploading' | 'processing' | 'done' | 'error'
@@ -36,13 +41,15 @@ export function createProgress() {
   }
 
   // start seeds per-preset counters before the stream opens. fileCount is how
-  // many events each preset will emit (one per uploaded file).
-  function start(presetNames, fileCount) {
+  // many events a per-file preset will emit (one per uploaded file); a bundle
+  // preset emits exactly one, so its expected is 1. bundleSet (a Set of preset
+  // names, optional) marks which presets are bundles.
+  function start(presetNames, fileCount, bundleSet = new Set()) {
     errorMessage = null;
     downloadUrl = null;
     const next = {};
     for (const name of presetNames) {
-      next[name] = { expected: fileCount, completed: 0 };
+      next[name] = { expected: bundleSet.has(name) ? 1 : fileCount, completed: 0 };
     }
     presetProgress = next;
     status = 'uploading';

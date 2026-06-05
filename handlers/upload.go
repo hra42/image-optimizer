@@ -30,11 +30,13 @@ var allowedExts = map[string]bool{
 	".avif": true,
 	".heic": true,
 	".heif": true,
+	".svg":  true,
 }
 
 // allowedSniffed is the set of MIME types http.DetectContentType may return for
 // our supported inputs. AVIF and HEIC/HEIF are absent on purpose — the stdlib
-// sniffer does not recognize them, so they are admitted by extension.
+// sniffer does not recognize them, so they are admitted by extension. SVG is
+// sniffed as text/xml or text/plain (it is XML), so it too relies on extension.
 var allowedSniffed = map[string]bool{
 	"image/jpeg": true,
 	"image/png":  true,
@@ -78,12 +80,31 @@ func Upload(store *Store, maxFileBytes int64) fiber.Handler {
 			})
 		}
 
-		job := store.Create(len(files) * len(presets))
+		// Per-image presets run once per file; bundle presets (e.g. a document
+		// PDF) consume all files at once and count as a single unit each.
+		imagePresets, bundlePresets := partitionPresets(presets)
+		total := len(files)*len(imagePresets) + len(bundlePresets)
+
+		job := store.Create(total)
 		// Track the goroutine so graceful shutdown can drain in-flight jobs.
-		store.Go(func() { runJob(job, files, presets) })
+		store.Go(func() { runJob(job, files, imagePresets, bundlePresets) })
 
 		return c.JSON(fiber.Map{"jobId": job.ID})
 	}
+}
+
+// partitionPresets splits resolved presets into per-image presets (run once per
+// file) and bundle presets (run once over all files), preserving order within
+// each group.
+func partitionPresets(ps []processor.Preset) (image, bundle []processor.Preset) {
+	for _, p := range ps {
+		if p.IsBundle() {
+			bundle = append(bundle, p)
+		} else {
+			image = append(image, p)
+		}
+	}
+	return image, bundle
 }
 
 // selectPresets resolves the requested preset names (each value may itself be a
@@ -132,7 +153,7 @@ func readValidImage(fh *multipart.FileHeader, maxFileBytes int64) ([]byte, error
 	ext := strings.ToLower(filepath.Ext(fh.Filename))
 	sniff := http.DetectContentType(data) // reads up to the first 512 bytes
 	if !allowedSniffed[sniff] && !allowedExts[ext] {
-		return nil, fmt.Errorf("%q is not a supported image (JPEG, PNG, WebP, AVIF, HEIC)", fh.Filename)
+		return nil, fmt.Errorf("%q is not a supported image (JPEG, PNG, WebP, AVIF, HEIC, SVG)", fh.Filename)
 	}
 	return data, nil
 }

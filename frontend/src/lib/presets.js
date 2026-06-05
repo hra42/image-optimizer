@@ -45,7 +45,11 @@ export const PRESET_GROUPS = [
   {
     category: 'LinkedIn',
     accent: 'sapphire',
-    presets: [{ name: 'linkedin', label: 'Post', dims: '1200×627', help: 'Recommended size for a LinkedIn shared post or link preview image.' }],
+    presets: [
+      { name: 'linkedin', label: 'Post', dims: '1200×627', help: 'Recommended size for a LinkedIn shared post or link preview image.' },
+      { name: 'linkedin_profile_banner', label: 'Profile banner', dims: '1584×396', help: 'Cover/background image for a personal LinkedIn profile.' },
+      { name: 'linkedin_company_banner', label: 'Company banner', dims: '1128×191', help: 'Cover image for a LinkedIn company / organization page.' },
+    ],
   },
   {
     category: 'Twitter / X',
@@ -68,6 +72,18 @@ export const PRESET_GROUPS = [
     presets: [{ name: 'og_image', label: 'OG image', dims: '1200×630', help: 'The preview image shown when your page is shared on social apps and chat (the og:image). Use this if you’re setting up link previews for a website.' }],
   },
   {
+    // Documents are BUNDLE presets: every uploaded image becomes one page of a
+    // single multi-page PDF (in upload order), instead of one output per image.
+    // Mirrors KindDocumentPDF in processor/preset.go; names listed in
+    // BUNDLE_PRESETS below.
+    category: 'Documents',
+    accent: 'green',
+    presets: [
+      { name: 'linkedin_doc_portrait', label: 'LinkedIn doc — portrait', dims: '1080×1350 · multi-page PDF', help: 'Combines ALL uploaded images into one multi-page PDF — a LinkedIn document / carousel post — in upload order. Each image becomes a portrait page.' },
+      { name: 'linkedin_doc_square', label: 'LinkedIn doc — square', dims: '1080×1080 · multi-page PDF', help: 'Combines ALL uploaded images into one multi-page PDF, in upload order. Each image becomes a square page.' },
+    ],
+  },
+  {
     category: 'Icons & Thumbnails',
     accent: 'yellow',
     presets: [
@@ -88,6 +104,16 @@ export const PRESET_GROUPS = [
 export const PRESET_NAMES = PRESET_GROUPS.flatMap((g) =>
   g.presets.map((p) => p.name),
 );
+
+// BUNDLE_PRESETS are the presets that consume ALL uploaded files at once and
+// emit a single combined output (a multi-page PDF) rather than one output per
+// image. Mirror of Preset.IsBundle() / KindDocumentPDF in processor/preset.go —
+// keep the two in sync. Used so progress accounting expects ONE unit for these
+// (not one per file). See stores/progress.svelte.js.
+export const BUNDLE_PRESETS = new Set([
+  'linkedin_doc_portrait',
+  'linkedin_doc_square',
+]);
 
 // name → { label, category, dims, accent, help } lookup, for rendering a single
 // preset by name (its label, dimensions, the category's accent color, and the

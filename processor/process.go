@@ -86,3 +86,56 @@ func ProcessStream(ctx context.Context, buf []byte, presets []Preset, onResult R
 	}
 	return results, nil
 }
+
+// ProcessBundle runs one bundle preset (KindDocumentPDF) over ALL uploaded
+// buffers at once, producing a single Result whose Files holds one named PDF.
+// bufs are in upload order; page order follows. Per-page renders go through the
+// same worker admission as ProcessStream so a large carousel can't exceed the
+// libvips concurrency cap; pages are rendered sequentially (ordered, bounded
+// memory — carousels are small). Failures land in Result.Err.
+func ProcessBundle(ctx context.Context, bufs [][]byte, p Preset) Result {
+	res := Result{Preset: p}
+
+	pages := make([]pdfPage, 0, len(bufs))
+	for _, buf := range bufs {
+		// Check cancellation first: a select with both a ready semaphore and a
+		// done context picks at random, so an already-cancelled context could
+		// otherwise slip through the admission selects below.
+		if err := ctx.Err(); err != nil {
+			res.Err = err
+			return res
+		}
+
+		// Admission to the queue (back-pressure), then a worker slot.
+		select {
+		case queueSem <- struct{}{}:
+		case <-ctx.Done():
+			res.Err = ctx.Err()
+			return res
+		}
+		select {
+		case activeSem <- struct{}{}:
+		case <-ctx.Done():
+			<-queueSem
+			res.Err = ctx.Err()
+			return res
+		}
+
+		pg, err := renderDocumentPage(buf, p)
+		<-activeSem
+		<-queueSem
+		if err != nil {
+			res.Err = err
+			return res
+		}
+		pages = append(pages, pg)
+	}
+
+	data, err := buildDocumentPDF(pages)
+	if err != nil {
+		res.Err = err
+		return res
+	}
+	res.Files = []OutputFile{{Name: p.Name + ".pdf", Data: data}}
+	return res
+}

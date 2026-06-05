@@ -13,7 +13,7 @@
 
   // Accepted input types, mirroring the backend (handlers/upload.go).
   // HEIC/HEIF are iPhone photos — libvips decodes them server-side.
-  const ACCEPT_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif'];
+  const ACCEPT_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.avif', '.heic', '.heif', '.svg'];
   const ACCEPT_MIME = [
     'image/jpeg',
     'image/png',
@@ -21,6 +21,7 @@
     'image/avif',
     'image/heic',
     'image/heif',
+    'image/svg+xml',
   ];
 
   function isAccepted(file) {
@@ -51,6 +52,14 @@
       files = [...files, ...additions];
     }
   }
+
+  // True when the selection includes any SVG. SVG is vector, so the full-size
+  // presets (Convert / Website) rasterize at a fixed density rather than a
+  // pixel size copied from the source — worth flagging so the output dimensions
+  // aren't a surprise. Mirrors the density bump in processor/pipeline.go.
+  const hasSVG = $derived(
+    files.some((entry) => entry.file.name.toLowerCase().endsWith('.svg')),
+  );
 
   function removeAt(i) {
     const entry = files[i];
@@ -147,7 +156,7 @@
       {dragActive ? 'Drop images to add them' : 'Drag & drop images here'}
     </span>
     <span class="text-base text-ctp-subtext1">
-      or click to browse — JPEG, PNG, WebP, AVIF, HEIC
+      or click to browse — JPEG, PNG, WebP, AVIF, HEIC, SVG
     </span>
   </button>
 
@@ -156,7 +165,7 @@
     type="file"
     class="hidden"
     multiple
-    accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.avif,.heic,.heif"
+    accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,image/svg+xml,.jpg,.jpeg,.png,.webp,.avif,.heic,.heif,.svg"
     onchange={onInputChange}
   />
 
@@ -198,5 +207,32 @@
         </li>
       {/each}
     </ul>
+  {/if}
+
+  {#if hasSVG}
+    <p
+      class="animate-fade-up flex items-start gap-2 rounded-lg border border-ctp-mauve/30 bg-ctp-mauve/5 px-3 py-2 text-sm leading-relaxed text-ctp-subtext1"
+    >
+      <svg
+        class="mt-0.5 h-4 w-4 flex-none text-ctp-mauve"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
+        />
+      </svg>
+      <span>
+        <span class="font-semibold text-ctp-text">SVG is vector.</span>
+        Social and icon presets render it sharp at their exact size. The full-size
+        <span class="font-medium text-ctp-mauve">Convert</span> / <span class="font-medium text-ctp-blue">Website</span>
+        presets rasterize at 4× the SVG’s drawing size (e.g. a 256px icon → ~1024px).
+      </span>
+    </p>
   {/if}
 </div>

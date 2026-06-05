@@ -39,11 +39,27 @@ func makeSourcePNG(t *testing.T, w, h int) []byte {
 	return buf.Bytes()
 }
 
+// nonBundlePresets returns the registry minus bundle presets (document PDFs),
+// mirroring how the upload handler partitions them away from the per-file
+// Process path.
+func nonBundlePresets() []Preset {
+	var out []Preset
+	for _, p := range AllPresets() {
+		if !p.IsBundle() {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func TestProcessAllPresets(t *testing.T) {
 	const srcW, srcH = 2000, 1500
 	src := makeSourcePNG(t, srcW, srcH)
 
-	presets := AllPresets()
+	// Bundle presets (document PDFs) consume all files at once and go through
+	// ProcessBundle, not the per-file Process path — the handler partitions them
+	// out, so mirror that here and cover them in TestProcessBundleDocumentPDF.
+	presets := nonBundlePresets()
 	results, err := Process(context.Background(), src, presets)
 	if err != nil {
 		t.Fatalf("Process returned error: %v", err)
@@ -144,6 +160,62 @@ func assertFaviconPack(t *testing.T, r Result) {
 	}
 }
 
+// svgSource is a minimal vector document whose intrinsic size is a small
+// 64×64. Without the density bump, the "keep original size" presets would
+// rasterize it at ~64px; with svgRasterDensity (4×) they should land far larger.
+const svgSource = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#1e1e2e"/>
+  <circle cx="32" cy="32" r="24" fill="#89b4fa"/>
+</svg>`
+
+// TestProcessSVGInput verifies SVG input flows through every preset: resize
+// presets render the vector straight to their exact target dimensions, and the
+// "keep original size" presets rasterize at the bumped density so the output is
+// a usable size rather than the SVG's tiny intrinsic dimensions.
+func TestProcessSVGInput(t *testing.T) {
+	src := []byte(svgSource)
+
+	if !isSVG(src) {
+		t.Fatal("isSVG did not recognize the SVG source")
+	}
+
+	// Bundle presets go through ProcessBundle, not the per-file Process path.
+	results, err := Process(context.Background(), src, nonBundlePresets())
+	if err != nil {
+		t.Fatalf("Process returned error: %v", err)
+	}
+
+	for _, r := range results {
+		if r.Err != nil {
+			t.Errorf("preset %q failed on SVG input: %v", r.Preset.Name, r.Err)
+			continue
+		}
+		if r.Preset.Kind == KindFaviconPack {
+			assertFaviconPack(t, r)
+			continue
+		}
+		if len(r.Data) == 0 {
+			t.Errorf("preset %q produced empty output", r.Preset.Name)
+			continue
+		}
+
+		if r.Preset.Resizes() {
+			// Vector source rendered straight to the target box.
+			if r.Width != r.Preset.Width || r.Height != r.Preset.Height {
+				t.Errorf("preset %q reported %dx%d, want %dx%d", r.Preset.Name, r.Width, r.Height, r.Preset.Width, r.Preset.Height)
+			}
+			continue
+		}
+
+		// Density-bumped render: a 64px-wide SVG at 4× density should produce
+		// noticeably more than its intrinsic size.
+		if r.Width <= 64 {
+			t.Errorf("preset %q rendered SVG at %dx%d — density bump did not apply", r.Preset.Name, r.Width, r.Height)
+		}
+	}
+}
+
 func TestProcessContextCancel(t *testing.T) {
 	src := makeSourcePNG(t, 800, 600)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -152,5 +224,69 @@ func TestProcessContextCancel(t *testing.T) {
 	_, err := Process(ctx, src, AllPresets())
 	if err == nil {
 		t.Error("Process with a cancelled context returned nil error, want context.Canceled")
+	}
+}
+
+// TestRenderDocumentPage verifies one source buffer is centre-cropped to the
+// preset's per-page box and encoded as JPEG.
+func TestRenderDocumentPage(t *testing.T) {
+	p, _ := PresetByName("linkedin_doc_portrait")
+	src := makeSourcePNG(t, 2000, 1500)
+
+	page, err := renderDocumentPage(src, p)
+	if err != nil {
+		t.Fatalf("renderDocumentPage: %v", err)
+	}
+	if page.wPx != p.Width || page.hPx != p.Height {
+		t.Errorf("page is %dx%d, want %dx%d", page.wPx, page.hPx, p.Width, p.Height)
+	}
+	if page.format != FormatJPEG {
+		t.Errorf("page format = %q, want jpeg", page.format)
+	}
+	img, err := vips.NewImageFromBuffer(page.data)
+	if err != nil {
+		t.Fatalf("page data failed to decode: %v", err)
+	}
+	defer img.Close()
+	if img.Width() != p.Width || img.Height() != p.Height {
+		t.Errorf("decoded page %dx%d, want %dx%d", img.Width(), img.Height(), p.Width, p.Height)
+	}
+}
+
+// TestProcessBundleDocumentPDF runs the full bundle path over several sources
+// and asserts a single multi-page PDF comes back, named after the preset.
+func TestProcessBundleDocumentPDF(t *testing.T) {
+	p, _ := PresetByName("linkedin_doc_portrait")
+	bufs := [][]byte{
+		makeSourcePNG(t, 1600, 1200),
+		makeSourcePNG(t, 800, 800),
+		makeSourcePNG(t, 1000, 2000),
+	}
+
+	r := ProcessBundle(context.Background(), bufs, p)
+	if r.Err != nil {
+		t.Fatalf("ProcessBundle: %v", r.Err)
+	}
+	if len(r.Files) != 1 {
+		t.Fatalf("got %d files, want 1", len(r.Files))
+	}
+	f := r.Files[0]
+	if f.Name != "linkedin_doc_portrait.pdf" {
+		t.Errorf("file name = %q, want linkedin_doc_portrait.pdf", f.Name)
+	}
+	if !bytes.HasPrefix(f.Data, []byte("%PDF-")) {
+		t.Error("bundle output is not a PDF (missing %PDF- magic)")
+	}
+}
+
+// TestProcessBundleCancel verifies a cancelled context aborts the bundle.
+func TestProcessBundleCancel(t *testing.T) {
+	p, _ := PresetByName("linkedin_doc_square")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	r := ProcessBundle(ctx, [][]byte{makeSourcePNG(t, 400, 400)}, p)
+	if r.Err == nil {
+		t.Error("ProcessBundle with a cancelled context returned nil Err, want context.Canceled")
 	}
 }

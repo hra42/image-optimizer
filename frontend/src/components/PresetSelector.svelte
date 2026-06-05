@@ -38,6 +38,7 @@
     teal:     { legend: 'text-ctp-teal',     on: 'border-ctp-teal bg-ctp-teal/10 shadow-md shadow-ctp-teal/20',          off: 'hover:border-ctp-teal/60',     check: 'peer-checked:border-ctp-teal peer-checked:bg-ctp-teal' },
     yellow:   { legend: 'text-ctp-yellow',   on: 'border-ctp-yellow bg-ctp-yellow/10 shadow-md shadow-ctp-yellow/20',    off: 'hover:border-ctp-yellow/60',   check: 'peer-checked:border-ctp-yellow peer-checked:bg-ctp-yellow' },
     peach:    { legend: 'text-ctp-peach',    on: 'border-ctp-peach bg-ctp-peach/10 shadow-md shadow-ctp-peach/20',       off: 'hover:border-ctp-peach/60',    check: 'peer-checked:border-ctp-peach peer-checked:bg-ctp-peach' },
+    green:    { legend: 'text-ctp-green',    on: 'border-ctp-green bg-ctp-green/10 shadow-md shadow-ctp-green/20',       off: 'hover:border-ctp-green/60',    check: 'peer-checked:border-ctp-green peer-checked:bg-ctp-green' },
   };
 
   function accentOf(name) {

@@ -10,12 +10,10 @@ package processor
 
 import (
 	"context"
-	"errors"
 )
 
-// ErrVipsNotBuilt is returned by Process when the binary was built without the
-// `vips` tag, i.e. without libvips support compiled in.
-var ErrVipsNotBuilt = errors.New("processor: built without 'vips' tag; libvips unavailable")
+// ErrVipsNotBuilt is declared in preset.go (tag-free) so it exists in both the
+// vips and non-vips builds.
 
 // Startup is a no-op in non-vips builds. The workers argument is accepted to
 // match the real signature but ignored, since no processing runs.
@@ -33,4 +31,11 @@ func Process(ctx context.Context, buf []byte, presets []Preset) ([]Result, error
 // callback is never invoked in this build.
 func ProcessStream(ctx context.Context, buf []byte, presets []Preset, onResult ResultFunc) ([]Result, error) {
 	return nil, ErrVipsNotBuilt
+}
+
+// ProcessBundle reports (via Result.Err) that libvips support was not compiled
+// in. The error is carried in the Result, matching the real implementation's
+// failure path so runJob's bundle phase handles both modes identically.
+func ProcessBundle(ctx context.Context, bufs [][]byte, p Preset) Result {
+	return Result{Preset: p, Err: ErrVipsNotBuilt}
 }
