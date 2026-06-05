@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  go:
-    name: Go test & vet
+  go-stub:
+    name: Go test & vet (stub mode)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,17 +21,28 @@ jobs:
           go-version: '1.26'
           cache: true
 
-      # libvips dev headers so the vips-tagged tests/build link against libvips.
-      - name: Install libvips
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libvips-dev pkg-config
-
-      - name: go vet (stub mode)
+      - name: go vet
         run: go vet ./...
 
-      - name: go test (stub mode, tag-free packages)
+      - name: go test (tag-free packages)
         run: go test ./...
+
+  go-vips:
+    name: Go test & vet (vips)
+    runs-on: ubuntu-latest
+    # Run inside the same Debian bookworm + libvips source as the production
+    # Dockerfile builder stage. Debian's libvips ships an AV1 encoder, so AVIF
+    # presets encode correctly here — Ubuntu's apt libvips does not, and fails
+    # heifsave with "Unsupported compression".
+    container: golang:1.26-bookworm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install libvips
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends libvips-dev pkg-config
+          rm -rf /var/lib/apt/lists/*
 
       - name: go vet (vips)
         run: go vet -tags vips ./...
