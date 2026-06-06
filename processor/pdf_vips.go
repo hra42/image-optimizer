@@ -8,12 +8,12 @@ import (
 	"github.com/davidbyttow/govips/v2/vips"
 )
 
-// renderDocumentPage centre-crops one source buffer to the preset's per-page box
-// (the same crop path as the fixed-size image presets) and encodes it via the
+// renderDocumentPage attention-crops one source buffer to the preset's per-page
+// box (the same crop path as the fixed-size image presets) and encodes it via the
 // shared export(). The result is one ready-to-place PDF page. Mirrors the render
 // step in favicon_vips.go.
 func renderDocumentPage(buf []byte, p Preset) (pdfPage, error) {
-	img, err := vips.NewThumbnailWithSizeFromBuffer(buf, p.Width, p.Height, vips.InterestingCentre, vips.SizeBoth)
+	img, err := vips.NewThumbnailWithSizeFromBuffer(buf, p.Width, p.Height, cropInteresting, vips.SizeBoth)
 	if err != nil {
 		return pdfPage{}, fmt.Errorf("render page %q: %w", p.Name, err)
 	}
