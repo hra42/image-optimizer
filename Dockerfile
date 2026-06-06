@@ -14,6 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libvips-dev pkg-config curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# VERSION is the release string shown in the UI footer (via /version). It is
+# passed in at build time because .git is dockerignored, so the build can't run
+# `git describe` itself — compute it on the host and forward it:
+#   docker build --build-arg VERSION="$(git describe --tags --always)" .
+# Falls back to "dev" when not supplied.
+ARG VERSION=dev
+
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
@@ -22,7 +29,10 @@ COPY . .
 COPY --from=frontend /app/frontend/dist ./frontend/dist
 # The `vips` tag compiles the govips/libvips integration (headers from
 # libvips-dev above). Local builds omit it so the toolchain works without libvips.
-RUN CGO_ENABLED=1 GOOS=linux go build -tags "vips" -o /app/image-optimizer .
+# -X main.version stamps the build version into the binary.
+RUN CGO_ENABLED=1 GOOS=linux go build -tags "vips" \
+        -ldflags "-X main.version=${VERSION}" \
+        -o /app/image-optimizer .
 
 # ---- Stage 3: minimal runtime ----
 FROM debian:bookworm-slim AS runtime
