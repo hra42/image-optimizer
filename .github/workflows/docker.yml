@@ -48,5 +48,11 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Stamp the build version (shown in the UI footer via /version) from the
+          # release tag that triggered this run, e.g. "v0.4.0". On a manual
+          # workflow_dispatch from a non-tag ref this is the branch name; the
+          # binary's "dev" default never reaches a published image.
+          build-args: |
+            VERSION=${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
