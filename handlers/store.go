@@ -40,10 +40,13 @@ type outFile struct {
 	bundle bool
 }
 
-// srcFile is one uploaded image held in memory while its job runs.
+// srcFile is one uploaded image held in memory while its job runs. focal is the
+// optional per-file crop anchor (from the upload's "focals" field); when unset,
+// fixed-aspect presets fall back to the default attention crop.
 type srcFile struct {
-	base string
-	data []byte
+	base  string
+	data  []byte
+	focal processor.FocalPoint
 }
 
 // Job tracks one upload's lifecycle. Progress is reported as completed work
@@ -323,7 +326,17 @@ func runJob(job *Job, files []srcFile, imagePresets, bundlePresets []processor.P
 	// --- Per-file phase: each file through every per-image preset. ---
 	for _, f := range files {
 		f := f
-		_, err := processor.ProcessStream(context.Background(), f.data, imagePresets,
+		// The focal point is a property of the source file, but processImage only
+		// sees a Preset. Stamp the file's focal onto a per-file copy of the preset
+		// slice so the crop path can read it without changing any signatures. An
+		// unset focal is the zero value, so files the user didn't adjust keep the
+		// default attention crop.
+		filePresets := make([]processor.Preset, len(imagePresets))
+		copy(filePresets, imagePresets)
+		for i := range filePresets {
+			filePresets[i].Focal = f.focal
+		}
+		_, err := processor.ProcessStream(context.Background(), f.data, filePresets,
 			func(_ int, r processor.Result) {
 				job.mu.Lock()
 				job.done++

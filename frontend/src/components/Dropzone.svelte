@@ -3,7 +3,18 @@
   // selected files are bound back to the parent via `files`. Touch devices
   // (which don't support drag-and-drop) use the click fallback.
 
-  let { files = $bindable([]), disabled = false } = $props();
+  import CropModal from './CropModal.svelte';
+  import { cropAspects } from '../lib/presets.js';
+
+  let { files = $bindable([]), selectedPresets = [], disabled = false } = $props();
+
+  // The file entry whose crop is being adjusted (drives CropModal), or null.
+  let cropping = $state(null);
+
+  // True when at least one selected preset crops to a fixed shape, so the
+  // "Adjust crop" affordance is meaningful. When false the button is hidden to
+  // keep the default flow clean (the focal point would have no effect).
+  const anyCrops = $derived(selectedPresets.some((n) => n in cropAspects));
 
   let dragActive = $state(false);
   let inputEl = $state(null);
@@ -186,6 +197,20 @@
               {entry.file.name}
             </p>
             <p class="text-sm text-ctp-subtext1">{formatSize(entry.file.size)}</p>
+            {#if anyCrops}
+              <button
+                type="button"
+                class="mt-1 inline-flex items-center gap-1 text-xs font-medium transition-colors {entry.focal
+                  ? 'text-ctp-mauve hover:text-ctp-lavender'
+                  : 'text-ctp-blue hover:text-ctp-mauve'}"
+                onclick={() => (cropping = entry)}
+              >
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+                </svg>
+                {entry.focal ? 'Crop adjusted' : 'Adjust crop'}
+              </button>
+            {/if}
           </div>
           <button
             type="button"
@@ -236,3 +261,5 @@
     </p>
   {/if}
 </div>
+
+<CropModal bind:open={cropping} {selectedPresets} />

@@ -299,6 +299,92 @@ func TestCompressKeepsSourceFormat(t *testing.T) {
 	}
 }
 
+// makeHalfBandedPNG builds a w×h PNG whose top half is red and bottom half is
+// blue, so a focal-point crop's vertical placement is observable: a crop anchored
+// near the top should be dominated by red, near the bottom by blue.
+func makeHalfBandedPNG(t *testing.T, w, h int) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		c := color.RGBA{R: 255, A: 255}
+		if y >= h/2 {
+			c = color.RGBA{B: 255, A: 255}
+		}
+		for x := 0; x < w; x++ {
+			img.Set(x, y, c)
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("encode banded png: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// redFraction decodes a PNG and returns the fraction of pixels that are more red
+// than blue — a coarse "how much of the top band survived the crop" measure.
+func redFraction(t *testing.T, buf []byte) float64 {
+	t.Helper()
+	im, err := png.Decode(bytes.NewReader(buf))
+	if err != nil {
+		t.Fatalf("decode png: %v", err)
+	}
+	b := im.Bounds()
+	var red, total int
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			r, _, bl, _ := im.At(x, y).RGBA()
+			if r > bl {
+				red++
+			}
+			total++
+		}
+	}
+	if total == 0 {
+		return 0
+	}
+	return float64(red) / float64(total)
+}
+
+// TestFocalCropPlacement verifies that a per-file focal point actually moves the
+// crop window: cropping a tall red-over-blue source to a square should keep the
+// red top band when the focal is near the top and the blue bottom band when it is
+// near the bottom, and the output must be exactly the target size.
+func TestFocalCropPlacement(t *testing.T) {
+	// Tall source so a square crop must choose a vertical band.
+	src := makeHalfBandedPNG(t, 800, 2000)
+	p := Preset{Name: "instagram_square", Format: FormatPNG, Width: 1080, Height: 1080, Compression: 6}
+
+	top := p
+	top.Focal = FocalPoint{X: 0.5, Y: 0.05, Set: true}
+	bottom := p
+	bottom.Focal = FocalPoint{X: 0.5, Y: 0.95, Set: true}
+
+	rTop := processImage(src, top)
+	if rTop.Err != nil {
+		t.Fatalf("top focal: %v", rTop.Err)
+	}
+	rBot := processImage(src, bottom)
+	if rBot.Err != nil {
+		t.Fatalf("bottom focal: %v", rBot.Err)
+	}
+
+	for _, r := range []Result{rTop, rBot} {
+		if r.Width != 1080 || r.Height != 1080 {
+			t.Errorf("focal crop is %dx%d, want 1080x1080", r.Width, r.Height)
+		}
+	}
+
+	topRed := redFraction(t, rTop.Data)
+	botRed := redFraction(t, rBot.Data)
+	if topRed < 0.9 {
+		t.Errorf("top-focal crop is only %.2f red, expected mostly the red band", topRed)
+	}
+	if botRed > 0.1 {
+		t.Errorf("bottom-focal crop is %.2f red, expected mostly the blue band", botRed)
+	}
+}
+
 // DetermineImageTypeOf maps a buffer's detected vips image type back to our
 // Format, for test assertions.
 func DetermineImageTypeOf(buf []byte) Format {
