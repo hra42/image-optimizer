@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -68,15 +69,22 @@ func Upload(store *Store, maxFileBytes int64) fiber.Handler {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 
+		// Optional per-file crop anchors, indexed to upload order (see parseFocals).
+		focals, err := parseFocals(form.Value["focals"], len(headers))
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+
 		files := make([]srcFile, 0, len(headers))
-		for _, fh := range headers {
+		for i, fh := range headers {
 			data, err := readValidImage(fh, maxFileBytes)
 			if err != nil {
 				return fiber.NewError(fiber.StatusBadRequest, err.Error())
 			}
 			files = append(files, srcFile{
-				base: baseName(fh.Filename),
-				data: data,
+				base:  baseName(fh.Filename),
+				data:  data,
+				focal: focals[i],
 			})
 		}
 
@@ -130,6 +138,51 @@ func selectPresets(values []string) ([]processor.Preset, error) {
 		return nil, errNoPresets
 	}
 	return out, nil
+}
+
+// parseFocals resolves the optional "focals" form value into one FocalPoint per
+// uploaded file, indexed to upload order. The value (if present) is a single JSON
+// array parallel to the files: each element is {"x":..,"y":..} for a user-adjusted
+// crop or null to keep the default attention crop. n is the file count.
+//
+// Absent/empty focals are fine (no file was adjusted) and yield all-unset points.
+// A present array whose length doesn't match the file count is rejected, so a
+// focal can never be silently misattributed to the wrong file. Coordinates are
+// clamped to [0,1] rather than rejected — the UI derives them from pointer
+// positions and small float drift past the edge shouldn't fail the whole upload.
+func parseFocals(values []string, n int) ([]processor.FocalPoint, error) {
+	out := make([]processor.FocalPoint, n) // zero value = {Set: false}
+	if len(values) == 0 || strings.TrimSpace(values[0]) == "" {
+		return out, nil
+	}
+	var raw []*struct {
+		X float64 `json:"x"`
+		Y float64 `json:"y"`
+	}
+	if err := json.Unmarshal([]byte(values[0]), &raw); err != nil {
+		return nil, errors.New("invalid focals: expected a JSON array")
+	}
+	if len(raw) != n {
+		return nil, fmt.Errorf("focals length %d does not match %d files", len(raw), n)
+	}
+	for i, r := range raw {
+		if r == nil {
+			continue // null → keep the default attention crop for this file
+		}
+		out[i] = processor.FocalPoint{X: clamp01(r.X), Y: clamp01(r.Y), Set: true}
+	}
+	return out, nil
+}
+
+// clamp01 constrains v to the [0,1] normalized range.
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
 }
 
 // readValidImage enforces the size cap, reads the file into memory, and verifies

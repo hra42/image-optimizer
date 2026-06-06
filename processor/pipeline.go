@@ -4,6 +4,7 @@ package processor
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/davidbyttow/govips/v2/vips"
 )
@@ -44,6 +45,11 @@ func processImage(buf []byte, p Preset) Result {
 		err error
 	)
 	switch {
+	case p.Resizes() && p.Focal.Set:
+		// The user nudged a focal point for this file: crop around it explicitly
+		// instead of letting attention guess. Cover-scales then extracts an exact
+		// Width×Height window centred on the focal point (clamped to bounds).
+		img, err = focalCrop(buf, p.Width, p.Height, p.Focal)
 	case p.Resizes():
 		// Crop-to-fill at exact dimensions. The thumbnail path shrinks with
 		// Lanczos3 internally and guarantees an exact Width×Height via an
@@ -94,6 +100,44 @@ func processImage(buf []byte, p Preset) Result {
 	res.Width = img.Width()
 	res.Height = img.Height()
 	return res
+}
+
+// focalCrop renders a tw×th crop of buf centred on a normalized focal point.
+// It mirrors what the attention thumbnail does (cover-fill to exact dimensions,
+// Lanczos3 downscale) but positions the crop window deterministically: scale the
+// source so the target box is fully covered, then extract a tw×th window centred
+// on the focal point and clamped to the image bounds. EXIF orientation is baked
+// first so the focal coordinates (which the UI measured against the displayed,
+// upright image) line up with the pixels. The window math lives in focalWindow
+// (tag-free, unit-tested); this function is the libvips glue around it.
+func focalCrop(buf []byte, tw, th int, f FocalPoint) (*vips.ImageRef, error) {
+	img, err := vips.NewImageFromBuffer(buf)
+	if err != nil {
+		return nil, err
+	}
+	_ = img.AutoRotate()
+	sw, sh := img.Width(), img.Height()
+	if sw == 0 || sh == 0 {
+		img.Close()
+		return nil, fmt.Errorf("focal crop: zero source dimension")
+	}
+
+	// Cover-scale: the larger ratio guarantees both target dimensions are covered.
+	scale := math.Max(float64(tw)/float64(sw), float64(th)/float64(sh))
+	if err := img.Resize(scale, vips.KernelLanczos3); err != nil {
+		img.Close()
+		return nil, err
+	}
+
+	// Use the ACTUAL post-resize dims (rounding in libvips can differ from a
+	// predicted sw*scale by a pixel) so the extract window never exceeds bounds.
+	rw, rh := img.Width(), img.Height()
+	left, top, cw, ch := focalWindow(rw, rh, tw, th, f)
+	if err := img.ExtractArea(left, top, cw, ch); err != nil {
+		img.Close()
+		return nil, err
+	}
+	return img, nil
 }
 
 // resolveFormat maps a source buffer to the concrete output format a compress

@@ -30,7 +30,12 @@
     progress.start(selectedPresets, files.length, BUNDLE_PRESETS);
 
     const form = new FormData();
+    // Per-file focal points, indexed to the files appended below (same order).
+    // null for any file the user didn't adjust → backend keeps its attention
+    // crop. Harmless for non-cropping presets, which ignore the focal.
+    const focals = files.map((entry) => entry.focal ?? null);
     for (const entry of files) form.append('files', entry.file);
+    form.append('focals', JSON.stringify(focals));
     for (const name of selectedPresets) form.append('presets', name);
 
     let jobId;
@@ -89,7 +94,7 @@
       <HowItWorks />
     </div>
     <div class="animate-fade-up" style="animation-delay: 120ms">
-      <Dropzone bind:files />
+      <Dropzone bind:files {selectedPresets} />
     </div>
     <div class="animate-fade-up" style="animation-delay: 180ms">
       <PresetSelector bind:selected={selectedPresets} />

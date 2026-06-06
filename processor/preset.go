@@ -83,6 +83,65 @@ type Preset struct {
 	// FormatAuto to the input format and applies tier-tuned codec knobs instead
 	// of the (empty) Quality/Compression/Effort fields above.
 	Tier CompressTier
+
+	// Focal, when Set, is a per-file crop anchor stamped onto a per-file copy of
+	// the preset in runJob (the focal point is a property of the source image, not
+	// the preset). Fixed-aspect presets (Resizes()) crop around it instead of using
+	// the default attention crop. Unused by non-resizing and pack/bundle presets.
+	Focal FocalPoint
+}
+
+// FocalPoint is a normalized crop anchor in [0,1] with origin at the top-left.
+// When Set is false the pipeline keeps its default attention-based crop. It is
+// plain data (no govips types) so preset.go stays tag-free.
+type FocalPoint struct {
+	X, Y float64
+	Set  bool
+}
+
+// focalWindow computes the crop window for a focal-point crop. Given a resized
+// source of rw×rh (already scaled to cover the target box) and a target of tw×th,
+// it returns the top-left (left, top) of a tw×th window centered on the focal
+// point and clamped to the source bounds. It is pure integer math (no govips) so
+// it lives here, tag-free and unit-testable without libvips; the vips side
+// (focalCrop in pipeline.go) does the load/resize/extract around it. cw/ch are
+// returned clamped to the resized dims as a defensive measure (always tw/th in
+// practice, since rw>=tw and rh>=th after a cover-scale).
+func focalWindow(rw, rh, tw, th int, f FocalPoint) (left, top, cw, ch int) {
+	cw, ch = tw, th
+	if cw > rw {
+		cw = rw
+	}
+	if ch > rh {
+		ch = rh
+	}
+	left = clampInt(int(round(f.X*float64(rw)-float64(cw)/2)), 0, rw-cw)
+	top = clampInt(int(round(f.Y*float64(rh)-float64(ch)/2)), 0, rh-ch)
+	return left, top, cw, ch
+}
+
+// clampInt constrains v to [lo, hi]. If lo > hi (a degenerate source smaller than
+// the target), it returns lo so the window stays non-negative.
+func clampInt(v, lo, hi int) int {
+	if hi < lo {
+		return lo
+	}
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+// round rounds half away from zero (math.Round), reimplemented here so this
+// tag-free file needs no math import; the values are small and non-negative.
+func round(v float64) float64 {
+	if v < 0 {
+		return float64(int(v - 0.5))
+	}
+	return float64(int(v + 0.5))
 }
 
 // Resizes reports whether the preset crops to fixed dimensions. When false the

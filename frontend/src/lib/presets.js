@@ -136,6 +136,29 @@ export const BUNDLE_PRESETS = new Set([
   'linkedin_doc_square',
 ]);
 
+// cropAspects maps each fixed-aspect (cropping) preset name to its target aspect
+// ratio { w, h }. These are the presets the backend runs through the crop-to-fill
+// path (Preset.Resizes() — both Width and Height set), so they honor a per-file
+// focal point; the CropModal uses this both to decide whether the focal nudge
+// will affect the output and to draw the crop-box guide. Derived from the WxH
+// dims strings above so it stays in sync with the registry. Full-size presets
+// (Convert/Compress/Website) and the favicon/srcset/document packs are absent —
+// they don't crop to a fixed box, so a focal point doesn't apply.
+export const cropAspects = Object.fromEntries(
+  PRESET_GROUPS.flatMap((g) =>
+    g.presets
+      .map((p) => {
+        // Bundle packs carry a "1080×1350 · multi-page PDF" dims string but are
+        // not per-file crops, so exclude them explicitly.
+        if (BUNDLE_PRESETS.has(p.name)) return null;
+        const m = /^(\d+)\s*[×x]\s*(\d+)/.exec(p.dims ?? '');
+        if (!m) return null;
+        return [p.name, { w: Number(m[1]), h: Number(m[2]) }];
+      })
+      .filter(Boolean),
+  ),
+);
+
 // name → { label, category, dims, accent, help } lookup, for rendering a single
 // preset by name (its label, dimensions, the category's accent color, and the
 // help hint).
