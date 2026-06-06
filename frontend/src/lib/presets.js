@@ -25,6 +25,15 @@ export const PRESET_GROUPS = [
     ],
   },
   {
+    category: 'Compress',
+    accent: 'flamingo',
+    presets: [
+      { name: 'compress_best', label: 'Best quality', dims: 'Original size · keeps format', help: 'Makes the file smaller while staying near-indistinguishable from the original. Keeps the same format (JPEG stays JPEG, PNG stays PNG, WebP stays WebP). For "smaller but I won\'t notice."' },
+      { name: 'compress_balanced', label: 'Balanced', dims: 'Original size · keeps format', help: 'The everyday web default: a strong size reduction with great quality. Keeps the source format and dimensions. Pick this if unsure.' },
+      { name: 'compress_max', label: 'Max savings', dims: 'Original size · keeps format', help: 'The smallest file, for email, slow connections, or tight upload limits — quality is reduced more noticeably. Keeps the source format. (PNG savings are modest except here, where it switches to a reduced colour palette.)' },
+    ],
+  },
+  {
     category: 'Website',
     accent: 'blue',
     presets: [

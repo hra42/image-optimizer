@@ -21,6 +21,30 @@ const (
 	FormatWebP Format = "webp"
 	FormatAVIF Format = "avif"
 	FormatPNG  Format = "png"
+
+	// FormatAuto is a sentinel meaning "keep the source image's format". It is
+	// never exported directly: the vips pipeline detects the input format and
+	// resolves it to one of the concrete formats above (see resolveFormat in
+	// pipeline.go), then writes the resolved Format back onto the Result's preset
+	// so the download handler picks the right extension. Used by the compress_*
+	// presets, which only re-encode and must not change the file type.
+	FormatAuto Format = "auto"
+)
+
+// CompressTier selects an encoding aggressiveness for the compress_* presets.
+// These presets keep the source format and dimensions and only tune the codec
+// knobs; the per-format knob values for each tier are resolved in the pipeline
+// (see compressParams in pipeline.go), not stored on the registry row, because
+// they depend on the format that FormatAuto resolves to. TierNone (the zero
+// value) means "this is not a compress preset" — every existing preset is
+// unaffected.
+type CompressTier int
+
+const (
+	TierNone CompressTier = iota
+	TierBest
+	TierBalanced
+	TierMax
 )
 
 // Kind selects how the pipeline turns a preset into output. KindImage (the zero
@@ -51,6 +75,11 @@ type Preset struct {
 	Progressive bool // JPEG interlace
 	Effort      int  // AVIF Effort / WebP ReductionEffort
 	Compression int  // PNG compression (0–9)
+
+	// Tier, when non-zero, marks a compress preset: the pipeline resolves
+	// FormatAuto to the input format and applies tier-tuned codec knobs instead
+	// of the (empty) Quality/Compression/Effort fields above.
+	Tier CompressTier
 }
 
 // Resizes reports whether the preset crops to fixed dimensions. When false the
@@ -114,6 +143,14 @@ var presets = []Preset{
 	{Name: "convert_png", Format: FormatPNG, Compression: 6},
 	{Name: "convert_webp", Format: FormatWebP, Quality: 90},
 	{Name: "convert_avif", Format: FormatAVIF, Quality: 80, Effort: 4},
+
+	// Compress: "just make this smaller for the web" — keep the source format
+	// (FormatAuto) and original dimensions, tune only the encoding across three
+	// honest tiers. The per-format knobs for each tier live in compressParams
+	// (pipeline.go), since they depend on the format FormatAuto resolves to.
+	{Name: "compress_best", Format: FormatAuto, Tier: TierBest},
+	{Name: "compress_balanced", Format: FormatAuto, Tier: TierBalanced},
+	{Name: "compress_max", Format: FormatAuto, Tier: TierMax},
 
 	{Name: "instagram_square", Format: FormatJPEG, Width: 1080, Height: 1080, Quality: 80, Progressive: true},
 	{Name: "instagram_portrait", Format: FormatJPEG, Width: 1080, Height: 1350, Quality: 80, Progressive: true},

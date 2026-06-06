@@ -107,6 +107,9 @@ turning an iPhone HEIC straight into JPEG/PNG/WebP/AVIF without any other tool.
 | `convert_png`        | PNG    | original    | compression 6 (lossless)       |
 | `convert_webp`       | WebP   | original    | quality 90 — faithful conversion |
 | `convert_avif`       | AVIF   | original    | quality 80, effort 4 — faithful conversion |
+| `compress_best`      | source | original    | re-encode only — near-lossless, keeps the source format |
+| `compress_balanced`  | source | original    | re-encode only — strong shrink, great quality |
+| `compress_max`       | source | original    | re-encode only — aggressive (PNG uses a lossy palette when it helps) |
 | `website_webp`       | WebP   | original    | quality 80 (web-optimized)     |
 | `website_avif`       | AVIF   | original    | quality 60, effort 4 (web-optimized) |
 | `jpeg_original`      | JPEG   | original    | quality 80, progressive        |
@@ -126,6 +129,13 @@ turning an iPhone HEIC straight into JPEG/PNG/WebP/AVIF without any other tool.
 
 Fixed-size presets center-crop to the target dimensions; `*_original` presets
 keep the source dimensions and just re-encode + strip metadata.
+
+The **`compress_*` presets** are the "just make this smaller for the web" path:
+they keep the source format (JPEG→JPEG, PNG→PNG, WebP→WebP; HEIC→JPEG, SVG→PNG)
+and the original dimensions, tuning only the encoding across three honest tiers
+(best / balanced / max savings). PNG savings are modest — it has no quality
+knob — so only `compress_max` tries a lossy palette, and only keeps it when it
+actually comes out smaller.
 
 ### Favicon pack
 

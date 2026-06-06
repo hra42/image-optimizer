@@ -219,6 +219,93 @@ func TestProcessSVGInput(t *testing.T) {
 	}
 }
 
+// reencode loads a source buffer and re-exports it in the given format, so the
+// compress tests have a real JPEG / WebP / AVIF input to feed FormatAuto.
+func reencode(t *testing.T, src []byte, f Format) []byte {
+	t.Helper()
+	img, err := vips.NewImageFromBuffer(src)
+	if err != nil {
+		t.Fatalf("load source for re-encode: %v", err)
+	}
+	defer img.Close()
+	out, err := export(img, Preset{Format: f, Quality: 95, Effort: 4, Compression: 6})
+	if err != nil {
+		t.Fatalf("re-encode to %q: %v", f, err)
+	}
+	return out
+}
+
+// TestCompressKeepsSourceFormat verifies the compress_* presets keep the input
+// format (FormatAuto resolves to the detected source type) and that the three
+// tiers are honest: for the lossy formats, Max savings ≤ Balanced ≤ Best.
+func TestCompressKeepsSourceFormat(t *testing.T) {
+	png := makeSourcePNG(t, 1200, 900)
+	sources := map[Format][]byte{
+		FormatJPEG: reencode(t, png, FormatJPEG),
+		FormatPNG:  png,
+		FormatWebP: reencode(t, png, FormatWebP),
+		FormatAVIF: reencode(t, png, FormatAVIF),
+	}
+
+	tiers := []string{"compress_best", "compress_balanced", "compress_max"}
+
+	for srcFormat, src := range sources {
+		var sizes []int
+		for _, name := range tiers {
+			p, ok := PresetByName(name)
+			if !ok {
+				t.Fatalf("preset %q not found", name)
+			}
+			r := processImage(src, p)
+			if r.Err != nil {
+				t.Errorf("%s on %s input: %v", name, srcFormat, r.Err)
+				continue
+			}
+			// The resolved format is written back onto the Result's preset so the
+			// download handler picks the right extension.
+			if r.Preset.Format != srcFormat {
+				t.Errorf("%s on %s input resolved to %q, want %q", name, srcFormat, r.Preset.Format, srcFormat)
+			}
+			// The bytes must actually decode as that format.
+			if got := DetermineImageTypeOf(r.Data); got != srcFormat {
+				t.Errorf("%s on %s input produced %q bytes, want %q", name, srcFormat, got, srcFormat)
+			}
+			// Dimensions are preserved (keep original).
+			if r.Width != 1200 || r.Height != 900 {
+				t.Errorf("%s on %s input is %dx%d, want 1200x900", name, srcFormat, r.Width, r.Height)
+			}
+			sizes = append(sizes, len(r.Data))
+		}
+		// Every format must shrink monotonically across the tiers. For the lossy
+		// formats this comes from the quality knobs; for PNG, Best == Balanced
+		// (identical lossless) and Max is guarded to never exceed them — so the
+		// "max ≤ balanced ≤ best" invariant holds with equality for PNG too.
+		if len(sizes) == 3 {
+			if !(sizes[2] <= sizes[1] && sizes[1] <= sizes[0]) {
+				t.Errorf("%s tiers not monotonic (best=%d balanced=%d max=%d); want max ≤ balanced ≤ best",
+					srcFormat, sizes[0], sizes[1], sizes[2])
+			}
+		}
+	}
+}
+
+// DetermineImageTypeOf maps a buffer's detected vips image type back to our
+// Format, for test assertions.
+func DetermineImageTypeOf(buf []byte) Format {
+	switch vips.DetermineImageType(buf) {
+	case vips.ImageTypeJPEG:
+		return FormatJPEG
+	case vips.ImageTypePNG:
+		return FormatPNG
+	case vips.ImageTypeWEBP:
+		return FormatWebP
+	case vips.ImageTypeAVIF:
+		return FormatAVIF
+	default:
+		return Format("unknown")
+	}
+}
+
 func TestProcessContextCancel(t *testing.T) {
 	src := makeSourcePNG(t, 800, 600)
 	ctx, cancel := context.WithCancel(context.Background())
