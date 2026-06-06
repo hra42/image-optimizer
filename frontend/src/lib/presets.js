@@ -136,6 +136,13 @@ export const BUNDLE_PRESETS = new Set([
   'linkedin_doc_square',
 ]);
 
+// PACK_PRESETS are per-file presets that expand into MULTIPLE files (a folder in
+// the ZIP) rather than a single image: the favicon pack and the responsive
+// srcset pack. They never qualify for the single-file raw-image download, so the
+// frontend counts them as multi-output. Mirror of the pack Kinds in
+// processor/preset.go (KindFaviconPack / KindSrcsetPack).
+export const PACK_PRESETS = new Set(['favicon', 'srcset_web']);
+
 // cropAspects maps each fixed-aspect (cropping) preset name to its target aspect
 // ratio { w, h }. These are the presets the backend runs through the crop-to-fill
 // path (Preset.Resizes() — both Width and Height set), so they honor a per-file

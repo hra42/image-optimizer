@@ -64,14 +64,15 @@ type Job struct {
 	// It is set once at Create and never mutated, so it needs no lock.
 	createdAt time.Time
 
-	mu       sync.Mutex
-	total    int
-	done     int
-	status   string // processing | complete | error
-	finished bool
-	events   []progressEvent      // append-only history for replay
-	outputs  []outFile            // successful outputs for the ZIP
-	subs     []chan progressEvent // active SSE subscribers
+	mu        sync.Mutex
+	total     int
+	done      int
+	status    string // processing | complete | error
+	finished  bool
+	downloads int                  // count of completed downloads (see MarkDownloaded)
+	events    []progressEvent      // append-only history for replay
+	outputs   []outFile            // successful outputs for the ZIP
+	subs      []chan progressEvent // active SSE subscribers
 }
 
 // Store is the in-memory job registry. No Redis, no disk: jobs live until their
@@ -298,6 +299,18 @@ func (j *Job) closeSubsLocked() {
 		close(c)
 	}
 	j.subs = nil
+}
+
+// MarkDownloaded records one completed download and returns the new running
+// count. The download handler keeps a job alive through the first download (so an
+// auto-download leaves the manual button working as a fallback) and frees it on
+// the second — the user has clearly got the file by then. The TTL reaper is the
+// backstop if a second download never comes.
+func (j *Job) MarkDownloaded() int {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.downloads++
+	return j.downloads
 }
 
 // Outputs returns the successful outputs collected so far.
