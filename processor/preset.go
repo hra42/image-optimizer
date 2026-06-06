@@ -51,15 +51,18 @@ const (
 // value) is the normal one-image-out path. KindFaviconPack produces a whole set
 // of files (multiple PNG sizes, an .ico, a web manifest, an HTML snippet) bundled
 // under a folder in the ZIP, so a single preset can yield a drop-in favicon pack.
-// KindDocumentPDF is a *bundle* kind: it consumes ALL uploaded files at once and
-// emits one multi-page PDF (each image a page, in upload order) — a LinkedIn
-// document/carousel post. Unlike the other kinds it is not per-file.
+// KindSrcsetPack is likewise a per-file pack: one source becomes a folder of
+// widths, each in AVIF + WebP + JPEG, plus a paste-in <picture> snippet and a
+// README. KindDocumentPDF is a *bundle* kind: it consumes ALL uploaded files at
+// once and emits one multi-page PDF (each image a page, in upload order) — a
+// LinkedIn document/carousel post. Unlike the other kinds it is not per-file.
 type Kind int
 
 const (
 	KindImage Kind = iota
 	KindFaviconPack
 	KindDocumentPDF
+	KindSrcsetPack
 )
 
 // Preset describes one output variant: target format, dimensions, and the
@@ -171,6 +174,14 @@ var presets = []Preset{
 	{Name: "favicon", Kind: KindFaviconPack, Format: FormatPNG, Compression: 6},
 	// thumbnail stays a single square PNG for anyone who just wants one icon.
 	{Name: "thumbnail", Format: FormatPNG, Width: 400, Height: 400, Compression: 6},
+
+	// Responsive srcset pack: one source → a folder of widths each in AVIF + WebP
+	// + JPEG, plus a paste-in <picture> snippet and a README. Width/Height are
+	// unused — the pack defines its own widths (see srcsetWidths in
+	// srcset_vips.go). Format is a placeholder; the assembler emits all three
+	// formats. Quality/Effort/Progressive are the master web-optimized knobs the
+	// assembler applies per format (matching the website_* defaults).
+	{Name: "srcset_web", Kind: KindSrcsetPack, Format: FormatWebP, Quality: 80, Effort: 4, Progressive: true},
 
 	// Wide JPEG banners.
 	{Name: "email_header", Format: FormatJPEG, Width: 600, Height: 200, Quality: 80, Progressive: true},

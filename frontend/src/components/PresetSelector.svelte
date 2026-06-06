@@ -40,6 +40,7 @@
     peach:    { legend: 'text-ctp-peach',    on: 'border-ctp-peach bg-ctp-peach/10 shadow-md shadow-ctp-peach/20',       off: 'hover:border-ctp-peach/60',    check: 'peer-checked:border-ctp-peach peer-checked:bg-ctp-peach' },
     green:    { legend: 'text-ctp-green',    on: 'border-ctp-green bg-ctp-green/10 shadow-md shadow-ctp-green/20',       off: 'hover:border-ctp-green/60',    check: 'peer-checked:border-ctp-green peer-checked:bg-ctp-green' },
     flamingo: { legend: 'text-ctp-flamingo', on: 'border-ctp-flamingo bg-ctp-flamingo/10 shadow-md shadow-ctp-flamingo/20', off: 'hover:border-ctp-flamingo/60', check: 'peer-checked:border-ctp-flamingo peer-checked:bg-ctp-flamingo' },
+    rosewater:{ legend: 'text-ctp-rosewater', on: 'border-ctp-rosewater bg-ctp-rosewater/10 shadow-md shadow-ctp-rosewater/20', off: 'hover:border-ctp-rosewater/60', check: 'peer-checked:border-ctp-rosewater peer-checked:bg-ctp-rosewater' },
   };
 
   function accentOf(name) {

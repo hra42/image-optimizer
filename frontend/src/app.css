@@ -23,6 +23,7 @@
   --ctp-lavender: #b4befe;
   --ctp-red: #f38ba8;
   --ctp-flamingo: #f2cdcd;
+  --ctp-rosewater: #f5e0dc;
 }
 
 /* Map the palette onto Tailwind color tokens (Tailwind v4 @theme). */
@@ -45,6 +46,7 @@
   --color-ctp-lavender: var(--ctp-lavender);
   --color-ctp-red: var(--ctp-red);
   --color-ctp-flamingo: var(--ctp-flamingo);
+  --color-ctp-rosewater: var(--ctp-rosewater);
 }
 
 html,
