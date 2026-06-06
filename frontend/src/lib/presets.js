@@ -82,6 +82,17 @@ export const PRESET_GROUPS = [
     presets: [{ name: 'og_image', label: 'OG image', dims: '1200×630', help: 'The preview image shown when your page is shared on social apps and chat (the og:image). Use this if you’re setting up link previews for a website.' }],
   },
   {
+    // Responsive is a per-file PACK (like the favicon pack): one source image
+    // becomes a folder of widths, each in AVIF + WebP + JPEG, plus a paste-in
+    // <picture> snippet. Mirrors KindSrcsetPack in processor/preset.go. NOT a
+    // bundle — it runs once per uploaded image, so it is absent from BUNDLE_PRESETS.
+    category: 'Responsive',
+    accent: 'rosewater',
+    presets: [
+      { name: 'srcset_web', label: 'Responsive srcset pack', dims: 'Widths 480–1920 · AVIF+WebP+JPEG + <picture>', help: 'Turns one image into a folder of widths (480–1920px), each in AVIF, WebP, and JPEG, plus a ready-to-paste <picture> snippet — drop-in responsive images done right. Widths larger than your source are skipped (no upscaling).' },
+    ],
+  },
+  {
     // Documents are BUNDLE presets: every uploaded image becomes one page of a
     // single multi-page PDF (in upload order), instead of one output per image.
     // Mirrors KindDocumentPDF in processor/preset.go; names listed in

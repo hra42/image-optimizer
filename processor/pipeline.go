@@ -17,6 +17,9 @@ func processImage(buf []byte, p Preset) Result {
 	if p.Kind == KindFaviconPack {
 		return buildFaviconPack(buf, p)
 	}
+	if p.Kind == KindSrcsetPack {
+		return buildSrcsetPack(buf, p)
+	}
 	// Bundle presets (document PDFs) consume all files at once and must go
 	// through ProcessBundle, not the per-file path. The handler partitions them
 	// out before they reach here; this guards against a caller that doesn't.

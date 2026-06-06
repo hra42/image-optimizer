@@ -82,6 +82,10 @@ func TestProcessAllPresets(t *testing.T) {
 			assertFaviconPack(t, r)
 			continue
 		}
+		if r.Preset.Kind == KindSrcsetPack {
+			assertSrcsetPack(t, r, srcW, srcH)
+			continue
+		}
 
 		if len(r.Data) == 0 {
 			t.Errorf("preset %q produced empty output", r.Preset.Name)
@@ -196,6 +200,12 @@ func TestProcessSVGInput(t *testing.T) {
 		}
 		if r.Preset.Kind == KindFaviconPack {
 			assertFaviconPack(t, r)
+			continue
+		}
+		if r.Preset.Kind == KindSrcsetPack {
+			// SVG rasterizes at a density-derived width, so assert structure
+			// (files present, snippet + README) rather than exact dimensions.
+			assertSrcsetPackStructure(t, r)
 			continue
 		}
 		if len(r.Data) == 0 {
