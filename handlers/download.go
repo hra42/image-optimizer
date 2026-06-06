@@ -23,6 +23,17 @@ func Download(store *Store) fiber.Handler {
 
 		outputs := job.Outputs()
 
+		// Single-file fast path: when the job produced exactly one output file,
+		// return it raw (with its real content-type and filename) instead of a
+		// one-entry ZIP — the common "one image, one preset" case. A pack (favicon
+		// has many members) or bundle, or any job with 2+ outputs, still ZIPs.
+		if of, ok := soleImageOutput(outputs); ok {
+			c.Attachment(of.preset + extFor(of.format))
+			c.Type(extFor(of.format)) // sets Content-Type from the extension
+			freeIfRedownloaded(store, job, jobID)
+			return c.Send(of.data)
+		}
+
 		// Content-Disposition: attachment; filename="optimized.zip".
 		c.Attachment("optimized.zip")
 
@@ -65,10 +76,22 @@ func Download(store *Store) fiber.Handler {
 			_ = zw.Close()
 			_ = w.Flush()
 
-			// Free the job once its bytes have been streamed. A second download
-			// of the same id then 404s, as the acceptance criteria expect.
-			store.Delete(jobID)
+			// The first download (typically the auto-download) keeps the job so the
+			// manual button still works; the second frees it. See freeIfRedownloaded.
+			freeIfRedownloaded(store, job, jobID)
 		})
+	}
+}
+
+// freeIfRedownloaded records a download and deletes the job once it has been
+// downloaded twice. The frontend auto-downloads on completion and also shows a
+// manual button as a fallback; keeping the job alive through the first download
+// means a fallback click still succeeds, while the second click (or a retry)
+// cleans up the in-memory state. The TTL reaper frees jobs that are never
+// downloaded a second time.
+func freeIfRedownloaded(store *Store, job *Job, jobID string) {
+	if job.MarkDownloaded() >= 2 {
+		store.Delete(jobID)
 	}
 }
 
@@ -131,6 +154,23 @@ func hasMultipleSources(outputs []outFile) bool {
 		}
 	}
 	return false
+}
+
+// soleImageOutput returns the single output and true when the job produced
+// exactly one plain image file — one output, with image data and no pack/bundle
+// members. That is the case we can serve raw instead of zipping. Packs (favicon,
+// srcset) and bundles (PDF) carry their files in `pack`, so they never qualify
+// even when they are the only output, since they are inherently multi-file or
+// folder-shaped.
+func soleImageOutput(outputs []outFile) (outFile, bool) {
+	if len(outputs) != 1 {
+		return outFile{}, false
+	}
+	of := outputs[0]
+	if of.bundle || len(of.pack) > 0 || of.data == nil {
+		return outFile{}, false
+	}
+	return of, true
 }
 
 // extFor maps an output format to its file extension.

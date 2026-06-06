@@ -3,13 +3,19 @@
   // selected files are bound back to the parent via `files`. Touch devices
   // (which don't support drag-and-drop) use the click fallback.
 
-  import CropModal from './CropModal.svelte';
   import { cropAspects } from '../lib/presets.js';
 
-  let { files = $bindable([]), selectedPresets = [], disabled = false } = $props();
-
-  // The file entry whose crop is being adjusted (drives CropModal), or null.
-  let cropping = $state(null);
+  // `cropping` is bound up to the parent (App), which renders CropModal at the
+  // page root. The modal MUST live outside Dropzone's `animate-fade-up` wrapper:
+  // that wrapper animates `transform`, which establishes a containing block and
+  // would make the modal's `position: fixed` resolve against the wrapper instead
+  // of the viewport — rendering the overlay inline and hiding its buttons.
+  let {
+    files = $bindable([]),
+    selectedPresets = [],
+    cropping = $bindable(null),
+    disabled = false,
+  } = $props();
 
   // True when at least one selected preset crops to a fixed shape, so the
   // "Adjust crop" affordance is meaningful. When false the button is hidden to
@@ -261,5 +267,3 @@
     </p>
   {/if}
 </div>
-
-<CropModal bind:open={cropping} {selectedPresets} />

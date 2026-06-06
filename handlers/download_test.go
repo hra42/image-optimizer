@@ -39,6 +39,53 @@ func TestHasMultipleSources(t *testing.T) {
 	}
 }
 
+// TestSoleImageOutput locks the single-file fast path: only a lone plain image
+// output is served raw; multi-output jobs, packs, and bundles still ZIP.
+func TestSoleImageOutput(t *testing.T) {
+	tests := []struct {
+		name    string
+		outputs []outFile
+		want    bool
+	}{
+		{"empty", nil, false},
+		{
+			name:    "one plain image",
+			outputs: []outFile{{preset: "instagram_square", format: processor.FormatJPEG, data: []byte("img")}},
+			want:    true,
+		},
+		{
+			name: "two images stay zipped",
+			outputs: []outFile{
+				{preset: "instagram_square", data: []byte("a")},
+				{preset: "convert_webp", data: []byte("b")},
+			},
+			want: false,
+		},
+		{
+			// A favicon pack is a single output but folder-shaped (many members).
+			name:    "lone pack stays zipped",
+			outputs: []outFile{{preset: "favicon", pack: []processor.OutputFile{{Name: "favicon.ico", Data: []byte("ico")}}}},
+			want:    false,
+		},
+		{
+			name:    "lone bundle stays zipped",
+			outputs: []outFile{{preset: "linkedin_doc_square", bundle: true, pack: []processor.OutputFile{{Name: "x.pdf", Data: []byte("%PDF")}}}},
+			want:    false,
+		},
+		{
+			name:    "nil data is not served raw",
+			outputs: []outFile{{preset: "instagram_square", data: nil}},
+			want:    false,
+		},
+	}
+	for _, tt := range tests {
+		_, got := soleImageOutput(tt.outputs)
+		if got != tt.want {
+			t.Errorf("%s: soleImageOutput ok = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
 // TestWriteBundleTopLevel verifies a bundle output lands at the ZIP root under
 // its member filename, never namespaced by source or preset folder.
 func TestWriteBundleTopLevel(t *testing.T) {
