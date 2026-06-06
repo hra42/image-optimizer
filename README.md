@@ -121,7 +121,6 @@ turning an iPhone HEIC straight into JPEG/PNG/WebP/AVIF without any other tool.
 | `og_image`           | PNG    | 1200×630    | compression 6                  |
 | `favicon`            | —      | —           | **favicon pack** (see below)   |
 | `thumbnail`          | PNG    | 400×400     | compression 6                  |
-| `remove_bg`          | PNG    | original    | **AI background removal** (see below) |
 | `email_header`       | JPEG   | 600×200     | progressive                    |
 | `web_banner`         | JPEG   | 1920×480    | progressive                    |
 
@@ -142,34 +141,6 @@ complete drop-in icon set, bundled under a `favicon/` folder in the ZIP:
 The pack is generated from a center-cropped square master. The multi-file plumbing
 lives in `Preset.Kind` / `Result.Files` (`processor/preset.go`,
 `processor/favicon_vips.go`, `processor/ico.go`).
-
-### Background removal
-
-The `remove_bg` preset cuts out the foreground subject and outputs the image on a
-transparent background as a PNG (at the original size). It runs **BiRefNet
-(general lite)** — the SwinT-backbone variant of the 2024
-[BiRefNet](https://github.com/ZhengPeng7/BiRefNet) dichotomous-segmentation model
-(the current practical-on-CPU SOTA), shipped via
-[rembg](https://github.com/danielgatis/rembg) — through ONNX Runtime, fully
-self-hosted in-process: no Python, no network calls. The model (~224 MB) and the
-onnxruntime shared library are vendored into the Docker image.
-
-Notes:
-
-- **Input must be JPEG or PNG.** This path decodes with Go's standard library
-  (independent of libvips), which doesn't handle WebP/AVIF/HEIC — those inputs fail
-  this one preset (others are unaffected).
-- It is **CPU-heavy** — BiRefNet runs at 1024×1024 (vs the millisecond libvips
-  presets), so expect a few seconds per image on CPU. Inference is serialized so a
-  batch doesn't spike memory or thrash the worker pool. (If you need it faster and
-  can accept lower edge quality, swap `ONNX_MODEL_PATH` to a lighter model such as
-  `u2netp` / `isnet-general-use` — note each model has its own preprocessing, so a
-  swap may need a code change.)
-- The pipeline is gated behind the **`onnx` build tag** (alongside `vips`). A plain
-  `go build` omits it, so local/stub builds report "background removal unavailable"
-  for this preset — only the production Docker image can run it. The implementation
-  lives in `processor/bg_onnx.go` (with the tag-free dispatch seam in
-  `processor/bg.go`).
 
 ## Development
 
@@ -232,13 +203,9 @@ the default rather than failing startup.
 | `MAX_FILE_SIZE_MB` | `50`             | Per-file upload cap. Larger files are rejected with `400`.         |
 | `WORKER_COUNT`     | number of CPUs   | Max concurrent libvips pipelines (the real concurrency limit).     |
 | `JOB_TTL_MINUTES`  | `10`             | How long a job's in-memory state is retained before the reaper frees it. |
-| `ONNX_MODEL_PATH`  | `/usr/local/share/onnx/birefnet-general-lite.onnx` | Path to the BiRefNet (general lite) model for the `remove_bg` preset (`onnx` builds only). |
-| `ONNXRUNTIME_LIB_PATH` | `/usr/local/lib/libonnxruntime.so.1.26.0` | Path to the onnxruntime shared library, loaded at runtime (`onnx` builds only). Must match the onnxruntime version the binding tracks. |
 
 The whole-request multipart body limit is derived from `MAX_FILE_SIZE_MB` plus
-headroom for multiple files and multipart boundaries. The two `ONNX_*` variables
-are only consulted by `onnx`-tagged builds (the production Docker image); a plain
-local build ignores them.
+headroom for multiple files and multipart boundaries.
 
 ## Requirements
 

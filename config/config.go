@@ -34,17 +34,6 @@ type Config struct {
 	// JobTTL is how long a job's in-memory state (including its output bytes)
 	// is retained before the reaper frees it (JOB_TTL_MINUTES, default 10m).
 	JobTTL time.Duration
-
-	// ONNXModelPath is the filesystem path to the U²-Netp segmentation model used
-	// by the remove_bg preset (ONNX_MODEL_PATH). Only consulted in `onnx`-tagged
-	// builds; the Docker image vendors the model at the default path.
-	ONNXModelPath string
-
-	// ONNXRuntimeLibPath is the filesystem path to the onnxruntime shared library,
-	// loaded at runtime via dlopen (ONNXRUNTIME_LIB_PATH). Only consulted in
-	// `onnx`-tagged builds. Must match the onnxruntime version the binding tracks
-	// (1.26.0); the Docker image vendors it at the default path.
-	ONNXRuntimeLibPath string
 }
 
 const (
@@ -52,12 +41,6 @@ const (
 	defaultMaxFileMB    = 50
 	defaultJobTTLMin    = 10
 	uploadHeadroomBytes = 14 << 20 // multipart boundaries + multi-file slack
-
-	// ONNX defaults. The Docker image vendors the model and the onnxruntime
-	// shared library at these paths (see Dockerfile). The .so filename is pinned
-	// to the onnxruntime version the binding tracks (1.26.0).
-	defaultONNXModelPath      = "/usr/local/share/onnx/birefnet-general-lite.onnx"
-	defaultONNXRuntimeLibPath = "/usr/local/lib/libonnxruntime.so.1.26.0"
 )
 
 // Load reads configuration from the environment, applies defaults for unset or
@@ -72,18 +55,15 @@ func Load() Config {
 	ttlMin := getenvInt("JOB_TTL_MINUTES", defaultJobTTLMin)
 
 	cfg := Config{
-		Port:               getenvStr("PORT", defaultPort),
-		MaxFileBytes:       maxFileBytes,
-		MaxUploadBytes:     maxFileBytes + uploadHeadroomBytes,
-		Workers:            workers,
-		JobTTL:             time.Duration(ttlMin) * time.Minute,
-		ONNXModelPath:      getenvStr("ONNX_MODEL_PATH", defaultONNXModelPath),
-		ONNXRuntimeLibPath: getenvStr("ONNXRUNTIME_LIB_PATH", defaultONNXRuntimeLibPath),
+		Port:           getenvStr("PORT", defaultPort),
+		MaxFileBytes:   maxFileBytes,
+		MaxUploadBytes: maxFileBytes + uploadHeadroomBytes,
+		Workers:        workers,
+		JobTTL:         time.Duration(ttlMin) * time.Minute,
 	}
 
-	log.Printf("config: port=%s maxFile=%dMB workers=%d jobTTL=%s onnxModel=%s onnxLib=%s",
-		cfg.Port, cfg.MaxFileBytes>>20, cfg.Workers, cfg.JobTTL,
-		cfg.ONNXModelPath, cfg.ONNXRuntimeLibPath)
+	log.Printf("config: port=%s maxFile=%dMB workers=%d jobTTL=%s",
+		cfg.Port, cfg.MaxFileBytes>>20, cfg.Workers, cfg.JobTTL)
 
 	return cfg
 }

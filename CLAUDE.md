@@ -31,41 +31,6 @@ mode — it serves `/health` and the SPA but **cannot process images** (uploads 
 the job). To exercise real processing you need the `vips` tag *and* libvips
 installed, which in practice means the full `docker build` (production image).
 
-## The `onnx` build tag — background removal
-
-The `remove_bg` preset (AI background removal, BiRefNet general-lite via ONNX
-Runtime) is gated behind a **second, independent build tag: `onnx`**. It composes with `vips` rather
-than nesting under it:
-
-- `//go:build onnx` file (`processor/bg_onnx.go`) holds all onnxruntime code and
-  does its **own** image decode/encode with the Go stdlib + `golang.org/x/image`
-  (NOT govips) — deliberately, so the `onnx` capability stays orthogonal to `vips`
-  and there's no 4-way tag matrix. Its `init()` registers the implementation.
-- The dispatch seam `processor/bg.go` is **tag-free**: it holds `ErrONNXNotBuilt`,
-  the `removeBackgroundFn` hook, and `ConfigureBackground`. When the `onnx` file
-  isn't compiled in, the hook is nil and `remove_bg` fails (only that preset) with
-  `ErrONNXNotBuilt`. Keep `bg.go` free of any onnxruntime import.
-- `pipeline.go` (vips) dispatches `KindBackgroundRemove` to `removeBackground` —
-  reached only in a `vips` build, so in pure stub mode `remove_bg` returns
-  `ErrVipsNotBuilt` before the onnx seam (acceptable: stub mode processes nothing).
-- The onnxruntime binding (`yalue/onnxruntime_go`) `dlopen`s the shared library at
-  runtime, so `go build -tags onnx` needs only CGO + a C compiler (no `.so` or
-  headers at build time). The `.so` and the model are vendored into the Docker
-  image and located via `ONNX_MODEL_PATH` / `ONNXRUNTIME_LIB_PATH` (config).
-- **Version pin:** the binding tag and the onnxruntime `.so` must agree on the
-  C-API version (`onnxruntime_go v1.31.0` ↔ onnxruntime `1.26.0`). The Dockerfile
-  `ARG ONNXRUNTIME_VERSION` and the `config` default `.so` path encode this — bump
-  them together.
-- **Model is BiRefNet general-lite** (1024² input, ImageNet normalization, sigmoid
-  on the output logits). The preprocessing in `bg_onnx.go` is **model-specific** —
-  swapping `ONNX_MODEL_PATH` to a different rembg model (u2netp 320²/no-sigmoid,
-  isnet 1024²/mean-0.5-std-1.0/no-sigmoid, etc.) needs matching code changes to
-  `bgInputSize`, the `bgMean`/`bgStd` constants, and the sigmoid step. The Dockerfile
-  fetches the model by MD5; bump that too if you change models.
-
-Local `go build -tags onnx ./...` type-checks `bg_onnx.go` (CGO required); the
-production image builds with `-tags "vips onnx"`.
-
 ## Commands
 
 Local (no libvips — stub mode, good for non-processing work and most tests):
@@ -80,12 +45,6 @@ Run the vips-tagged tests (requires libvips + headers installed):
 ```sh
 go test -tags vips ./...
 go build -tags vips -o image-optimizer .
-```
-
-Type-check the onnx-tagged background-removal code (CGO required; the binding
-vendors its own headers, so no onnxruntime install needed to compile):
-```sh
-CGO_ENABLED=1 go build -tags onnx ./processor/
 ```
 
 Frontend (in `frontend/`):

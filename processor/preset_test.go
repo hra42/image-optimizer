@@ -27,7 +27,6 @@ func TestAllPresetsMatchSpec(t *testing.T) {
 		"og_image":                {Name: "og_image", Format: FormatPNG, Width: 1200, Height: 630, Compression: 6},
 		"favicon":                 {Name: "favicon", Kind: KindFaviconPack, Format: FormatPNG, Compression: 6},
 		"thumbnail":               {Name: "thumbnail", Format: FormatPNG, Width: 400, Height: 400, Compression: 6},
-		"remove_bg":               {Name: "remove_bg", Kind: KindBackgroundRemove, Format: FormatPNG, Compression: 6},
 		"email_header":            {Name: "email_header", Format: FormatJPEG, Width: 600, Height: 200, Quality: 80, Progressive: true},
 		"web_banner":              {Name: "web_banner", Format: FormatJPEG, Width: 1920, Height: 480, Quality: 80, Progressive: true},
 		"linkedin_doc_portrait":   {Name: "linkedin_doc_portrait", Kind: KindDocumentPDF, Format: FormatJPEG, Width: 1080, Height: 1350, Quality: 85, Progressive: true},

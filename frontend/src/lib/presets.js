@@ -100,16 +100,6 @@ export const PRESET_GROUPS = [
       { name: 'web_banner', label: 'Web banner', dims: '1920×480', help: 'Full-width 1920×480 hero/banner strip for the top of a web page.' },
     ],
   },
-  {
-    // AI background removal: runs a U²-Net segmentation model and outputs the
-    // subject on a transparent background. Per-file (not a bundle). Stdlib image
-    // decoding means only JPEG/PNG inputs are supported for this preset.
-    category: 'AI',
-    accent: 'flamingo',
-    presets: [
-      { name: 'remove_bg', label: 'Remove background', dims: 'Transparent PNG · original size', help: 'Cuts out the subject and outputs a transparent PNG, removing the background. Uses BiRefNet for clean edges and hair. Works on JPEG and PNG inputs; best with one clear subject. High-quality AI — expect a few seconds per image.' },
-    ],
-  },
 ];
 
 export const PRESET_NAMES = PRESET_GROUPS.flatMap((g) =>
