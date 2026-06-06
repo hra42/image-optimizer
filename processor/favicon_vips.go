@@ -26,7 +26,7 @@ var faviconSizes = []struct {
 var icoSizes = []int{16, 32, 48}
 
 // buildFaviconPack renders the full favicon pack from the source buffer. Each
-// size is produced by a centre-crop-to-square thumbnail (InterestingCentre +
+// size is produced by an attention-cropped square thumbnail (cropInteresting +
 // SizeBoth), matching the cropping behaviour of the fixed-size image presets,
 // then PNG-encoded. The .ico is assembled from the 16/32/48 PNGs; the manifest
 // and README are static. Any failure aborts the whole pack (returned as the
@@ -43,7 +43,7 @@ func buildFaviconPack(buf []byte, p Preset) Result {
 		if existing, ok := pngBySize[px]; ok {
 			return existing, nil
 		}
-		img, err := vips.NewThumbnailWithSizeFromBuffer(buf, px, px, vips.InterestingCentre, vips.SizeBoth)
+		img, err := vips.NewThumbnailWithSizeFromBuffer(buf, px, px, cropInteresting, vips.SizeBoth)
 		if err != nil {
 			return nil, fmt.Errorf("render %dpx: %w", px, err)
 		}

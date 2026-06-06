@@ -8,6 +8,16 @@ import (
 	"github.com/davidbyttow/govips/v2/vips"
 )
 
+// cropInteresting is the gravity used by every crop-to-fill resize in the
+// pipeline (per-image presets, favicon pack, document PDF pages). Attention
+// lets libvips find the salient region (faces/subjects) and keep it in frame
+// instead of blindly centring — so a portrait squeezed into a square, or a wide
+// logo into a favicon, no longer clips the subject. It's a libvips primitive
+// (entropy/saliency over the pixels), not a model, so it stays inside the
+// lightweight envelope. Defined once here and shared so the gravity is a
+// single-line change (and a future per-file focal-point override hooks in here).
+const cropInteresting = vips.InterestingAttention
+
 // processImage runs a single preset over the source buffer: load from memory
 // (no disk), resize/crop to the target dimensions, strip metadata, and export
 // with the preset's tuned encoding params. Any failure is returned inside the
@@ -36,11 +46,12 @@ func processImage(buf []byte, p Preset) Result {
 	switch {
 	case p.Resizes():
 		// Crop-to-fill at exact dimensions. The thumbnail path shrinks with
-		// Lanczos3 internally and guarantees an exact Width×Height via a centre
-		// crop (SizeBoth lets it both up- and down-scale to hit the target box).
+		// Lanczos3 internally and guarantees an exact Width×Height via an
+		// attention crop (cropInteresting: keep the salient region in frame;
+		// SizeBoth lets it both up- and down-scale to hit the target box).
 		// For SVG input this renders the vector source straight to the target
 		// raster size, so the result stays crisp.
-		img, err = vips.NewThumbnailWithSizeFromBuffer(buf, p.Width, p.Height, vips.InterestingCentre, vips.SizeBoth)
+		img, err = vips.NewThumbnailWithSizeFromBuffer(buf, p.Width, p.Height, cropInteresting, vips.SizeBoth)
 	case isSVG(buf):
 		// "Keep original size" presets have no target dimensions, but SVG is
 		// vector — libvips would otherwise rasterize at the document's intrinsic
