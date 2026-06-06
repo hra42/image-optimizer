@@ -61,6 +61,15 @@ func processImage(buf []byte, p Preset) Result {
 		return res
 	}
 
+	// Compress presets carry FormatAuto + a Tier: resolve the output format from
+	// the input and swap in the tier-tuned codec knobs. The resolved preset is
+	// stored on the Result so the download handler emits the correct extension
+	// (it reads r.Preset.Format).
+	if p.Format == FormatAuto {
+		p = compressParams(p, resolveFormat(buf))
+		res.Preset = p
+	}
+
 	out, err := export(img, p)
 	if err != nil {
 		res.Err = fmt.Errorf("export %q: %w", p.Name, err)
@@ -71,6 +80,53 @@ func processImage(buf []byte, p Preset) Result {
 	res.Width = img.Width()
 	res.Height = img.Height()
 	return res
+}
+
+// resolveFormat maps a source buffer to the concrete output format a compress
+// preset should keep. JPEG/PNG/WebP/AVIF round-trip to themselves ("no surprise
+// file type"); inputs with no matching output codec degrade sensibly: SVG → PNG
+// (vector to lossless raster, preserving transparency), everything else (HEIC,
+// GIF, …) → JPEG (the safe photographic default).
+func resolveFormat(buf []byte) Format {
+	switch vips.DetermineImageType(buf) {
+	case vips.ImageTypeJPEG:
+		return FormatJPEG
+	case vips.ImageTypePNG:
+		return FormatPNG
+	case vips.ImageTypeWEBP:
+		return FormatWebP
+	case vips.ImageTypeAVIF:
+		return FormatAVIF
+	case vips.ImageTypeSVG:
+		return FormatPNG
+	default:
+		return FormatJPEG
+	}
+}
+
+// compressParams returns a copy of p with its Format set to the resolved format
+// and the tier-tuned codec knobs filled in for that format. The tiers are kept
+// honest — Max savings is visibly smaller than Best quality for the lossy
+// formats. PNG has no quality knob, so Best/Balanced are identical (max lossless
+// compression) and only Max diverges, via a lossy palette quantization.
+func compressParams(p Preset, f Format) Preset {
+	p.Format = f
+	switch f {
+	case FormatJPEG:
+		p.Progressive = true
+		p.Quality = map[CompressTier]int{TierBest: 90, TierBalanced: 80, TierMax: 65}[p.Tier]
+	case FormatWebP:
+		p.Quality = map[CompressTier]int{TierBest: 88, TierBalanced: 78, TierMax: 62}[p.Tier]
+		p.Effort = map[CompressTier]int{TierBest: 4, TierBalanced: 4, TierMax: 5}[p.Tier]
+	case FormatAVIF:
+		p.Quality = map[CompressTier]int{TierBest: 70, TierBalanced: 55, TierMax: 40}[p.Tier]
+		p.Effort = map[CompressTier]int{TierBest: 4, TierBalanced: 4, TierMax: 5}[p.Tier]
+	case FormatPNG:
+		// Always maximum lossless compression; only Max savings adds a lossy
+		// palette (handled in export when p.Tier == TierMax).
+		p.Compression = 9
+	}
+	return p
 }
 
 // svgRasterDensity is the DPI used to rasterize SVG input for "keep original
@@ -113,11 +169,31 @@ func export(img *vips.ImageRef, p Preset) ([]byte, error) {
 		})
 		return out, err
 	case FormatPNG:
-		out, _, err := img.ExportPng(&vips.PngExportParams{
+		lossless, _, err := img.ExportPng(&vips.PngExportParams{
 			Compression:   p.Compression,
 			StripMetadata: true,
 		})
-		return out, err
+		if err != nil {
+			return nil, err
+		}
+		// Max-savings compress on PNG: also try a palette (lossy) encode, since
+		// PNG has no quality knob. But palette + dithering can *inflate* smooth
+		// images (a gradient quantized to 256 colours compresses worse than the
+		// original), so keep whichever encode is actually smaller — "max savings"
+		// must never be larger than the lossless tiers. Other PNG presets keep the
+		// plain lossless path.
+		if p.Tier == TierMax {
+			palette, _, perr := img.ExportPng(&vips.PngExportParams{
+				Compression:   p.Compression,
+				StripMetadata: true,
+				Palette:       true,
+				Quality:       90,
+			})
+			if perr == nil && len(palette) < len(lossless) {
+				return palette, nil
+			}
+		}
+		return lossless, err
 	case FormatAVIF:
 		out, _, err := img.ExportAvif(&vips.AvifExportParams{
 			Quality:       p.Quality,
