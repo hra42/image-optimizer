@@ -23,6 +23,25 @@
   // transform that would otherwise trap its position:fixed overlay.
   let cropping = $state(null);
 
+  // Build version shown in the footer. Fetched once from /version (injected at
+  // build time from the git tag); stays '' if the request fails so the footer
+  // simply omits it. 'dev' is the local-build fallback the server reports.
+  let appVersion = $state('');
+  $effect(() => {
+    let cancelled = false;
+    fetch('/version')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.version) return;
+        // Show tags as "v0.3.1"; leave non-tag builds (e.g. "dev") as-is.
+        appVersion = /^\d/.test(d.version) ? `v${d.version}` : d.version;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  });
+
   let status = $derived(progress.status);
   let canSubmit = $derived(
     status === 'idle' && files.length > 0 && selectedPresets.length > 0,
@@ -245,6 +264,9 @@
     <button type="button" class="hover:text-ctp-blue" onclick={() => (legalOpen = 'privacy')}>
       Privacy Policy
     </button>
+    {#if appVersion}
+      <span class="text-ctp-overlay0/70" title="Build version">{appVersion}</span>
+    {/if}
   </footer>
 </main>
 

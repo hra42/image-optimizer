@@ -33,6 +33,14 @@ var frontendDist embed.FS
 // open connections to close, and how long we wait for in-flight jobs to drain.
 const shutdownGrace = 30 * time.Second
 
+// version is the build version, surfaced at /version and in the UI footer. It is
+// injected at build time from the git tag via:
+//
+//	go build -ldflags "-X main.version=$(git describe --tags)"
+//
+// (the Dockerfile passes this through a build arg). Local builds keep "dev".
+var version = "dev"
+
 func main() {
 	// -healthcheck turns the binary into its own health probe (used by the
 	// Docker HEALTHCHECK so the minimal runtime image needs no curl/wget).
@@ -61,7 +69,7 @@ func main() {
 	// API routes (health, upload, progress SSE, download). Registered before the
 	// SPA catch-all so they are not swallowed by the wildcard route. The returned
 	// store owns job lifecycle; start its TTL reaper and drain it on shutdown.
-	store := handlers.RegisterRoutes(app, cfg.MaxFileBytes)
+	store := handlers.RegisterRoutes(app, cfg.MaxFileBytes, version)
 	store.StartReaper(ctx, cfg.JobTTL)
 
 	// Serve the embedded Svelte SPA at the root.
