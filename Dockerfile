@@ -43,12 +43,18 @@ RUN CGO_ENABLED=1 GOOS=linux go build -tags "vips" \
 # ---- Stage 3: minimal runtime ----
 FROM debian:trixie-slim AS runtime
 # libvips42t64 is required by the image pipeline (the package was renamed from
-# libvips42 in trixie's time_t-64 transition). libheif1 + libde265-0 add HEIC/HEIF
-# decoding: libvips does not depend on libheif, and libheif itself needs an HEVC
-# decoder (libde265) or it loads the container but fails the bitstream with
-# "Unsupported codec". Without these, HEIC uploads decode to nothing → empty ZIP.
+# libvips42 in trixie's time_t-64 transition). On trixie libheif's codecs are
+# split into plugins, and the encoders are only Recommends — so with
+# --no-install-recommends they must be named explicitly or libvips loads but
+# fails on write:
+#   libde265-0              HEVC *decoder* — read HEIC (or decode fails:
+#                           "Unsupported codec")
+#   libheif-plugin-aomenc   AV1 *encoder*  — write AVIF (convert_avif,
+#                           website_avif, srcset AVIF members; else "heifsave:
+#                           Unsupported compression")
+# Without libheif at all, HEIC uploads decode to nothing → empty ZIP.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libvips42t64 libheif1 libde265-0 ca-certificates \
+        libvips42t64 libheif1 libde265-0 libheif-plugin-aomenc ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 app
 COPY --from=builder /app/image-optimizer /usr/local/bin/image-optimizer
