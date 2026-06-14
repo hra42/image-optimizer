@@ -74,6 +74,12 @@ type Preset struct {
 	Format      Format
 	Width       int // 0 = keep original
 	Height      int // 0 = keep original
+	// MaxDim caps the long edge: the image is scaled to fit within a
+	// MaxDim×MaxDim box, preserving aspect ratio, downscale-only (never enlarged,
+	// never cropped). 0 = no cap. Distinct from Width/Height, which crop-to-fill
+	// at exact dimensions. Used by the website_* presets so multi-megapixel phone
+	// photos come out web-performant instead of at full sensor resolution.
+	MaxDim      int
 	Quality     int
 	Progressive bool // JPEG interlace
 	Effort      int  // AVIF Effort / WebP ReductionEffort
@@ -150,6 +156,13 @@ func (p Preset) Resizes() bool {
 	return p.Width > 0 && p.Height > 0
 }
 
+// FitsWithin reports whether the preset caps the long edge to a bounding box
+// (downscale-only, aspect-preserving, no crop) rather than resizing to exact
+// dimensions. Resizes() (crop-to-fill) takes precedence when both are set.
+func (p Preset) FitsWithin() bool {
+	return p.MaxDim > 0 && !p.Resizes()
+}
+
 // IsBundle reports whether the preset consumes ALL uploaded files at once and
 // produces a single output for the whole job (rather than running per-file).
 // Bundle presets take a separate path through the orchestrator (see runJob's
@@ -187,15 +200,21 @@ type Result struct {
 // must not block for long. i is the preset's index in the input slice.
 type ResultFunc func(i int, r Result)
 
+// webMaxDim is the long-edge cap for the website_* presets: a common full-bleed
+// hero width that stays crisp on high-DPI displays while keeping files small
+// enough for good Core Web Vitals. Sources already smaller are not upscaled.
+const webMaxDim = 2560
+
 // presets is the canonical registry, defined once in spec order.
 var presets = []Preset{
-	{Name: "website_webp", Format: FormatWebP, Quality: 80},
-	{Name: "website_avif", Format: FormatAVIF, Quality: 60, Effort: 4},
-
-	// Full-size JPEG/PNG: optimize and strip metadata without resizing. The
-	// JPEG/PNG counterparts to website_webp/website_avif.
-	{Name: "jpeg_original", Format: FormatJPEG, Quality: 80, Progressive: true},
-	{Name: "png_original", Format: FormatPNG, Compression: 6},
+	// Website: web-ready output. The long edge is capped at 2560px (fit-inside,
+	// downscale-only) so multi-megapixel phone photos publish at a performant
+	// size instead of full sensor resolution — a 24MP HEIC drops from ~2MB to a
+	// few hundred KB. Smaller sources are left at their own size.
+	{Name: "website_webp", Format: FormatWebP, Quality: 80, MaxDim: webMaxDim},
+	{Name: "website_avif", Format: FormatAVIF, Quality: 60, Effort: 4, MaxDim: webMaxDim},
+	{Name: "jpeg_original", Format: FormatJPEG, Quality: 80, Progressive: true, MaxDim: webMaxDim},
+	{Name: "png_original", Format: FormatPNG, Compression: 6, MaxDim: webMaxDim},
 
 	// Convert: faithful, high-quality format conversion at the original size —
 	// the "just turn my iPhone HEIC into a usable file" path. Higher quality

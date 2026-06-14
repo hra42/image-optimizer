@@ -63,7 +63,15 @@ func processImage(buf []byte, p Preset) Result {
 		// vector — libvips would otherwise rasterize at the document's intrinsic
 		// size, which for icon SVGs is often tiny. Render at a higher density so
 		// the output is a usable size while preserving the author's proportions.
+		// Checked before FitsWithin so a website_* SVG keeps the density bump
+		// (the 2560px cap would otherwise leave a small icon rasterized tiny).
 		img, err = loadSVGAtDensity(buf, svgRasterDensity)
+	case p.FitsWithin():
+		// Cap the long edge to a MaxDim×MaxDim box: InterestingNone fits the whole
+		// image inside (no crop), SizeDown only ever shrinks (a source already
+		// within the box passes through untouched). This is what makes website_*
+		// publish a 24MP phone photo at a web-performant size.
+		img, err = vips.NewThumbnailWithSizeFromBuffer(buf, p.MaxDim, p.MaxDim, vips.InterestingNone, vips.SizeDown)
 	default:
 		// website_* presets keep the source dimensions.
 		img, err = vips.NewImageFromBuffer(buf)
