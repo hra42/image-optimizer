@@ -155,6 +155,14 @@ func resolveFormat(buf []byte) Format {
 		return FormatWebP
 	case vips.ImageTypeAVIF:
 		return FormatAVIF
+	case vips.ImageTypeHEIF:
+		// HEIC/HEIF (iPhone photos) is an HEVC-class codec with no encoder here,
+		// so "keep the source format" can't keep HEIC. Re-encoding to JPEG (the
+		// old default fall-through) actually grows the file, since JPEG is far
+		// less efficient. WebP is the most efficient format we can both write and
+		// serve broadly, so compress HEIC to WebP for real savings. (AVIF is
+		// available explicitly via convert_avif for anyone who wants it.)
+		return FormatWebP
 	case vips.ImageTypeSVG:
 		return FormatPNG
 	default:
