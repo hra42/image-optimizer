@@ -9,9 +9,15 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---- Stage 2: build the Go binary (cgo + libvips) ----
-FROM golang:1.26-bookworm AS builder
+# Trixie (not bookworm) for its newer libheif: bookworm's libheif 1.15 rejects
+# iPhone HEICs during decode ("Metadata not correctly assigned to image");
+# trixie's 1.19 decodes them fine. Builder and runtime bases must match.
+FROM golang:1.26-trixie AS builder
+# libheif-dev provides the HEIF/HEIC loader headers libvips' heifload links
+# against — libvips-dev only recommends it, so install it explicitly or HEIC
+# decoding is silently absent from the build.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libvips-dev pkg-config curl ca-certificates \
+        libvips-dev libheif-dev pkg-config curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # VERSION is the release string shown in the UI footer (via /version). It is
@@ -35,10 +41,20 @@ RUN CGO_ENABLED=1 GOOS=linux go build -tags "vips" \
         -o /app/image-optimizer .
 
 # ---- Stage 3: minimal runtime ----
-FROM debian:bookworm-slim AS runtime
-# libvips42 is required by the image pipeline.
+FROM debian:trixie-slim AS runtime
+# libvips42t64 is required by the image pipeline (the package was renamed from
+# libvips42 in trixie's time_t-64 transition). On trixie libheif's codecs are
+# split into plugins, and the encoders are only Recommends — so with
+# --no-install-recommends they must be named explicitly or libvips loads but
+# fails on write:
+#   libde265-0              HEVC *decoder* — read HEIC (or decode fails:
+#                           "Unsupported codec")
+#   libheif-plugin-aomenc   AV1 *encoder*  — write AVIF (convert_avif,
+#                           website_avif, srcset AVIF members; else "heifsave:
+#                           Unsupported compression")
+# Without libheif at all, HEIC uploads decode to nothing → empty ZIP.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libvips42 ca-certificates \
+        libvips42t64 libheif1 libde265-0 libheif-plugin-aomenc ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 app
 COPY --from=builder /app/image-optimizer /usr/local/bin/image-optimizer

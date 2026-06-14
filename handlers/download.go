@@ -23,12 +23,20 @@ func Download(store *Store) fiber.Handler {
 
 		outputs := job.Outputs()
 
+		// A finished job with no outputs means every preset failed (e.g. an
+		// undecodable input). runJob fails such jobs, but the endpoint is public,
+		// so guard here too: serve a 404 rather than a valid-but-empty ZIP, which
+		// would look like a successful download of nothing.
+		if len(outputs) == 0 {
+			return fiber.NewError(fiber.StatusNotFound, "job produced no output")
+		}
+
 		// Single-file fast path: when the job produced exactly one output file,
 		// return it raw (with its real content-type and filename) instead of a
 		// one-entry ZIP — the common "one image, one preset" case. A pack (favicon
 		// has many members) or bundle, or any job with 2+ outputs, still ZIPs.
 		if of, ok := soleImageOutput(outputs); ok {
-			c.Attachment(of.preset + extFor(of.format))
+			c.Attachment(entryName(of))
 			c.Type(extFor(of.format)) // sets Content-Type from the extension
 			freeIfRedownloaded(store, job, jobID)
 			return c.Send(of.data)
@@ -36,10 +44,6 @@ func Download(store *Store) fiber.Handler {
 
 		// Content-Disposition: attachment; filename="optimized.zip".
 		c.Attachment("optimized.zip")
-
-		// Whether to namespace entries by source filename depends on how many
-		// distinct sources contributed outputs.
-		multiSource := hasMultipleSources(outputs)
 
 		return c.SendStreamWriter(func(w *bufio.Writer) {
 			zw := zip.NewWriter(w)
@@ -53,19 +57,18 @@ func Download(store *Store) fiber.Handler {
 					}
 					continue
 				}
-				// Pack presets (e.g. favicon) expand into a folder of members;
-				// normal presets are a single named entry.
+				// Pack presets (e.g. favicon) expand into a folder of members —
+				// a favicon set is a drop-in unit, so it stays grouped.
 				if len(of.pack) > 0 {
-					if err := writePack(zw, of, multiSource); err != nil {
+					if err := writePack(zw, of); err != nil {
 						break
 					}
 					continue
 				}
-				name := of.preset + extFor(of.format)
-				if multiSource {
-					name = path.Join(of.srcBase, name)
-				}
-				fw, err := zw.Create(name)
+				// Plain image outputs are flat at the ZIP root, named
+				// "<source>_<preset>.<ext>" (e.g. IMG_0274_convert_jpeg.jpg).
+				// Source name + preset keeps every entry unique without folders.
+				fw, err := zw.Create(entryName(of))
 				if err != nil {
 					break
 				}
@@ -95,15 +98,13 @@ func freeIfRedownloaded(store *Store, job *Job, jobID string) {
 	}
 }
 
-// writePack writes every member of a pack preset into the ZIP under a folder
-// named after the preset (e.g. "favicon/favicon.ico"). When the job has multiple
-// source files the folder is further namespaced by source base, mirroring the
-// single-file path. Any write error aborts the pack.
-func writePack(zw *zip.Writer, of outFile, multiSource bool) error {
-	dir := of.preset
-	if multiSource {
-		dir = path.Join(of.srcBase, of.preset)
-	}
+// writePack writes every member of a pack preset into the ZIP under a single
+// folder (e.g. "IMG_0274_favicon/favicon.ico"). A favicon set is a drop-in unit,
+// so its members stay grouped rather than flattened. The folder is named with the
+// same "<source>_<preset>" convention as flat entries, which keeps packs from
+// different sources from colliding. Any write error aborts the pack.
+func writePack(zw *zip.Writer, of outFile) error {
+	dir := entryBase(of)
 	for _, member := range of.pack {
 		fw, err := zw.Create(path.Join(dir, member.Name))
 		if err != nil {
@@ -133,27 +134,21 @@ func writeBundle(zw *zip.Writer, of outFile) error {
 	return nil
 }
 
-// hasMultipleSources reports whether the outputs came from more than one source
-// file, which determines whether ZIP entries are namespaced by source. Bundle
-// outputs are job-wide (empty srcBase) and are excluded — otherwise their empty
-// source would always register as a distinct source and force namespacing.
-func hasMultipleSources(outputs []outFile) bool {
-	var first string
-	seen := false
-	for _, of := range outputs {
-		if of.bundle {
-			continue
-		}
-		if !seen {
-			first = of.srcBase
-			seen = true
-			continue
-		}
-		if of.srcBase != first {
-			return true
-		}
+// entryBase returns the "<source>_<preset>" stem for an output's ZIP entry,
+// e.g. "IMG_0274_convert_jpeg". Source name and preset together keep every entry
+// unique without namespacing folders. If the source base is unknown (e.g. an
+// older job), it falls back to just the preset so the name is still valid.
+func entryBase(of outFile) string {
+	if of.srcBase == "" {
+		return of.preset
 	}
-	return false
+	return of.srcBase + "_" + of.preset
+}
+
+// entryName is entryBase plus the output's file extension, used for flat image
+// entries and the single-file fast path (e.g. "IMG_0274_convert_jpeg.jpg").
+func entryName(of outFile) string {
+	return entryBase(of) + extFor(of.format)
 }
 
 // soleImageOutput returns the single output and true when the job produced

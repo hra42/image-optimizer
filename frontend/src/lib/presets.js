@@ -37,10 +37,10 @@ export const PRESET_GROUPS = [
     category: 'Website',
     accent: 'blue',
     presets: [
-      { name: 'website_webp', label: 'WebP', dims: 'Original size', help: 'Best all-round web format: small files, excellent quality, supported by all modern browsers. If unsure, pick this.' },
-      { name: 'website_avif', label: 'AVIF', dims: 'Original size', help: 'Smallest files for the web, newest format. Slightly slower to encode and not supported by a few older browsers. Great paired with a JPEG fallback.' },
-      { name: 'jpeg_original', label: 'JPEG', dims: 'Original size', help: 'The universal fallback. Works everywhere, ideal for photographs. No transparency support.' },
-      { name: 'png_original', label: 'PNG', dims: 'Original size', help: 'Lossless with transparency. Best for logos, icons, and graphics with sharp edges or text. Larger than WebP.' },
+      { name: 'website_webp', label: 'WebP', dims: 'Max 2560px · web-ready', help: 'Best all-round web format: small files, excellent quality, supported by all modern browsers. If unsure, pick this. Large photos are scaled down to 2560px on the long edge for fast page loads (smaller images are left as-is).' },
+      { name: 'website_avif', label: 'AVIF', dims: 'Max 2560px · web-ready', help: 'Smallest files for the web, newest format. Slightly slower to encode and not supported by a few older browsers. Great paired with a JPEG fallback. Scaled down to 2560px on the long edge.' },
+      { name: 'jpeg_original', label: 'JPEG', dims: 'Max 2560px · web-ready', help: 'The universal fallback. Works everywhere, ideal for photographs. No transparency support. Scaled down to 2560px on the long edge.' },
+      { name: 'png_original', label: 'PNG', dims: 'Max 2560px · web-ready', help: 'Lossless with transparency. Best for logos, icons, and graphics with sharp edges or text. Larger than WebP. Scaled down to 2560px on the long edge.' },
     ],
   },
   {

@@ -8,33 +8,40 @@ import (
 	"github.com/hra42/image-optimizer/processor"
 )
 
-func TestHasMultipleSources(t *testing.T) {
+// TestEntryName locks the flat "<source>_<preset>.<ext>" naming for image
+// entries: no namespacing folders, and source+preset together keep entries from
+// different sources unique even for the same preset.
+func TestEntryName(t *testing.T) {
 	tests := []struct {
-		name    string
-		outputs []outFile
-		want    bool
+		name string
+		of   outFile
+		want string
 	}{
-		{"empty", nil, false},
-		{"single source", []outFile{{srcBase: "a"}, {srcBase: "a"}}, false},
-		{"two sources", []outFile{{srcBase: "a"}, {srcBase: "b"}}, true},
 		{
-			// A bundle output has an empty srcBase; it must NOT be counted as a
-			// distinct source, or it would force every per-file output into a
-			// namespaced folder.
-			name:    "bundle ignored among single source",
-			outputs: []outFile{{srcBase: "a"}, {bundle: true}},
-			want:    false,
+			name: "source and preset",
+			of:   outFile{srcBase: "IMG_0274", preset: "convert_jpeg", format: processor.FormatJPEG},
+			want: "IMG_0274_convert_jpeg.jpg",
 		},
 		{
-			name:    "bundle ignored, real multi still detected",
-			outputs: []outFile{{srcBase: "a"}, {bundle: true}, {srcBase: "b"}},
-			want:    true,
+			name: "different source, same preset does not collide",
+			of:   outFile{srcBase: "IMG_0275", preset: "convert_jpeg", format: processor.FormatJPEG},
+			want: "IMG_0275_convert_jpeg.jpg",
 		},
-		{"only a bundle", []outFile{{bundle: true}}, false},
+		{
+			name: "webp extension",
+			of:   outFile{srcBase: "photo", preset: "convert_webp", format: processor.FormatWebP},
+			want: "photo_convert_webp.webp",
+		},
+		{
+			// No source base (defensive fallback) → preset-only, still valid.
+			name: "missing source falls back to preset",
+			of:   outFile{preset: "convert_png", format: processor.FormatPNG},
+			want: "convert_png.png",
+		},
 	}
 	for _, tt := range tests {
-		if got := hasMultipleSources(tt.outputs); got != tt.want {
-			t.Errorf("%s: hasMultipleSources = %v, want %v", tt.name, got, tt.want)
+		if got := entryName(tt.of); got != tt.want {
+			t.Errorf("%s: entryName = %q, want %q", tt.name, got, tt.want)
 		}
 	}
 }
@@ -108,11 +115,12 @@ func TestWriteBundleTopLevel(t *testing.T) {
 	}
 }
 
-// TestWritePackVsBundleNaming contrasts a pack (folder-namespaced) with a bundle
-// (top-level) so the divergence is locked in.
+// TestWritePackVsBundleNaming contrasts a pack (kept in a source-prefixed folder)
+// with a bundle (top-level) so the divergence is locked in.
 func TestWritePackVsBundleNaming(t *testing.T) {
 	pack := outFile{
-		preset: "favicon",
+		srcBase: "logo",
+		preset:  "favicon",
 		pack: []processor.OutputFile{
 			{Name: "favicon.ico", Data: []byte("ico")},
 		},
@@ -126,7 +134,7 @@ func TestWritePackVsBundleNaming(t *testing.T) {
 	}
 
 	names := writeToZip(t, func(zw *zip.Writer) {
-		if err := writePack(zw, pack, false); err != nil {
+		if err := writePack(zw, pack); err != nil {
 			t.Fatalf("writePack: %v", err)
 		}
 		if err := writeBundle(zw, bundle); err != nil {
@@ -135,8 +143,8 @@ func TestWritePackVsBundleNaming(t *testing.T) {
 	})
 
 	want := map[string]bool{
-		"favicon/favicon.ico":     true, // pack: under a preset folder
-		"linkedin_doc_square.pdf": true, // bundle: at the root
+		"logo_favicon/favicon.ico": true, // pack: under a "<source>_<preset>" folder
+		"linkedin_doc_square.pdf":  true, // bundle: at the root
 	}
 	if len(names) != len(want) {
 		t.Fatalf("ZIP entries = %v, want keys %v", names, want)

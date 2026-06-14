@@ -7,10 +7,10 @@ import "testing"
 
 func TestAllPresetsMatchSpec(t *testing.T) {
 	want := map[string]Preset{
-		"website_webp":            {Name: "website_webp", Format: FormatWebP, Quality: 80},
-		"website_avif":            {Name: "website_avif", Format: FormatAVIF, Quality: 60, Effort: 4},
-		"jpeg_original":           {Name: "jpeg_original", Format: FormatJPEG, Quality: 80, Progressive: true},
-		"png_original":            {Name: "png_original", Format: FormatPNG, Compression: 6},
+		"website_webp":            {Name: "website_webp", Format: FormatWebP, Quality: 80, MaxDim: webMaxDim},
+		"website_avif":            {Name: "website_avif", Format: FormatAVIF, Quality: 60, Effort: 4, MaxDim: webMaxDim},
+		"jpeg_original":           {Name: "jpeg_original", Format: FormatJPEG, Quality: 80, Progressive: true, MaxDim: webMaxDim},
+		"png_original":            {Name: "png_original", Format: FormatPNG, Compression: 6, MaxDim: webMaxDim},
 		"convert_jpeg":            {Name: "convert_jpeg", Format: FormatJPEG, Quality: 92, Progressive: true},
 		"convert_png":             {Name: "convert_png", Format: FormatPNG, Compression: 6},
 		"convert_webp":            {Name: "convert_webp", Format: FormatWebP, Quality: 90},
@@ -84,11 +84,23 @@ func TestPresetByName(t *testing.T) {
 func TestResizes(t *testing.T) {
 	website, _ := PresetByName("website_webp")
 	if website.Resizes() {
-		t.Error("website_webp should keep original dimensions (Resizes()=false)")
+		t.Error("website_webp should not crop-to-fill (Resizes()=false)")
+	}
+	// website_* caps the long edge instead of cropping: FitsWithin, not Resizes.
+	if !website.FitsWithin() {
+		t.Error("website_webp should fit within a max box (FitsWithin()=true)")
 	}
 	ig, _ := PresetByName("instagram_square")
 	if !ig.Resizes() {
 		t.Error("instagram_square should crop to fixed dimensions (Resizes()=true)")
+	}
+	if ig.FitsWithin() {
+		t.Error("instagram_square crops to exact size, not a fit box (FitsWithin()=false)")
+	}
+	// A plain compress preset neither crops nor caps.
+	cb, _ := PresetByName("compress_balanced")
+	if cb.Resizes() || cb.FitsWithin() {
+		t.Error("compress_balanced should neither resize nor fit-within")
 	}
 }
 

@@ -429,5 +429,17 @@ func runJob(job *Job, files []srcFile, imagePresets, bundlePresets []processor.P
 		}
 	}
 
+	// If every preset failed (e.g. an input format libvips can't decode, like
+	// HEIC when libheif is missing), job.outputs is empty. Finishing here would
+	// emit "complete" and hand the user a valid-but-empty ZIP with no error.
+	// Fail loudly instead — the frontend already surfaces the terminal "error".
+	job.mu.Lock()
+	empty := len(job.outputs) == 0
+	job.mu.Unlock()
+	if empty {
+		job.Fail()
+		return
+	}
+
 	job.Finish("/download/" + job.ID)
 }

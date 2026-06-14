@@ -50,6 +50,15 @@
     return byExt || byMime;
   }
 
+  // HEIC/HEIF can't be rendered by an <img> in any current browser, so a blob
+  // URL would just show a broken image. Detect those and show a placeholder
+  // instead — the file still uploads and converts server-side. Other accepted
+  // formats (incl. SVG) preview fine.
+  function previewable(file) {
+    const name = file.name.toLowerCase();
+    return !name.endsWith('.heic') && !name.endsWith('.heif');
+  }
+
   function fileKey(file) {
     return `${file.name}:${file.size}`;
   }
@@ -57,13 +66,15 @@
   function addFiles(fileList) {
     const incoming = Array.from(fileList).filter(isAccepted);
     if (incoming.length === 0) return;
-    const seen = new Set(files.map(fileKey));
+    const seen = new Set(files.map((entry) => entry.key));
     const additions = [];
     for (const f of incoming) {
       const key = fileKey(f);
       if (seen.has(key)) continue;
       seen.add(key);
-      additions.push({ file: f, url: URL.createObjectURL(f) });
+      // url is null for non-previewable formats (HEIC/HEIF); the template
+      // renders a placeholder in that case. key is stable for {#each} keying.
+      additions.push({ file: f, key, url: previewable(f) ? URL.createObjectURL(f) : null });
     }
     if (additions.length > 0) {
       files = [...files, ...additions];
@@ -80,14 +91,15 @@
 
   function removeAt(i) {
     const entry = files[i];
-    if (entry) URL.revokeObjectURL(entry.url);
+    if (entry?.url) URL.revokeObjectURL(entry.url);
     files = files.filter((_, idx) => idx !== i);
   }
 
   // Revoke any outstanding object URLs when the component is torn down.
+  // (HEIC/HEIF entries have a null url and nothing to revoke.)
   $effect(() => {
     return () => {
-      for (const entry of files) URL.revokeObjectURL(entry.url);
+      for (const entry of files) if (entry.url) URL.revokeObjectURL(entry.url);
     };
   });
 
@@ -188,22 +200,34 @@
 
   {#if files.length > 0}
     <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      {#each files as entry, i (entry.url)}
+      {#each files as entry, i (entry.key)}
         <li
           class="animate-fade-up relative flex items-center gap-3 rounded-lg border border-ctp-surface1 bg-ctp-surface0 p-2 transition-all duration-200 hover:-translate-y-0.5 hover:border-ctp-mauve/50 hover:shadow-md hover:shadow-ctp-mauve/10"
           style="animation-delay: {Math.min(i, 12) * 40}ms"
         >
-          <img
-            src={entry.url}
-            alt={entry.file.name}
-            class="h-12 w-12 flex-none rounded object-cover ring-1 ring-ctp-surface1"
-          />
+          {#if entry.url}
+            <img
+              src={entry.url}
+              alt={entry.file.name}
+              class="h-12 w-12 flex-none rounded object-cover ring-1 ring-ctp-surface1"
+            />
+          {:else}
+            <!-- HEIC/HEIF can't be rendered in-browser; show a placeholder. -->
+            <div
+              class="flex h-12 w-12 flex-none items-center justify-center rounded bg-ctp-surface1 text-ctp-overlay0 ring-1 ring-ctp-surface1"
+              title="Preview not available for this format"
+            >
+              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+              </svg>
+            </div>
+          {/if}
           <div class="min-w-0 flex-1">
             <p class="truncate text-base text-ctp-text" title={entry.file.name}>
               {entry.file.name}
             </p>
             <p class="text-sm text-ctp-subtext1">{formatSize(entry.file.size)}</p>
-            {#if anyCrops}
+            {#if anyCrops && entry.url}
               <button
                 type="button"
                 class="mt-1 inline-flex items-center gap-1 text-xs font-medium transition-colors {entry.focal
