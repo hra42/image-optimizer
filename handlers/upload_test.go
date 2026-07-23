@@ -106,3 +106,46 @@ func TestParseFocals(t *testing.T) {
 		}
 	})
 }
+
+func TestParseAILabel(t *testing.T) {
+	t.Run("absent disables label", func(t *testing.T) {
+		got, err := parseAILabel(nil)
+		if err != nil || got.Enabled() {
+			t.Fatalf("got %+v, err %v; want disabled", got, err)
+		}
+	})
+
+	t.Run("parses all options", func(t *testing.T) {
+		got, err := parseAILabel(map[string][]string{
+			"aiLabel":         {"modified"},
+			"aiLabelColor":    {"white"},
+			"aiLabelPosition": {"top-left"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Style != "modified" || got.Color != "white" || got.Position != "top-left" {
+			t.Fatalf("got %+v", got)
+		}
+	})
+
+	t.Run("defaults optional choices", func(t *testing.T) {
+		got, err := parseAILabel(map[string][]string{"aiLabel": {"generated"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Color != "black" || got.Position != "bottom-right" {
+			t.Fatalf("got %+v", got)
+		}
+	})
+
+	for _, values := range []map[string][]string{
+		{"aiLabel": {"other"}},
+		{"aiLabel": {"ai"}, "aiLabelColor": {"red"}},
+		{"aiLabel": {"ai"}, "aiLabelPosition": {"center"}},
+	} {
+		if _, err := parseAILabel(values); err == nil {
+			t.Errorf("expected error for %v", values)
+		}
+	}
+}

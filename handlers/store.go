@@ -335,7 +335,7 @@ func (j *Job) Finished() bool {
 // over ALL files (one progress unit per bundle preset). It runs in its own
 // goroutine off the upload request and therefore uses context.Background(): the
 // request context is canceled the moment the upload handler returns.
-func runJob(job *Job, files []srcFile, imagePresets, bundlePresets []processor.Preset) {
+func runJob(job *Job, files []srcFile, imagePresets, bundlePresets []processor.Preset, aiLabel processor.AILabel) {
 	// --- Per-file phase: each file through every per-image preset. ---
 	for _, f := range files {
 		f := f
@@ -348,6 +348,7 @@ func runJob(job *Job, files []srcFile, imagePresets, bundlePresets []processor.P
 		copy(filePresets, imagePresets)
 		for i := range filePresets {
 			filePresets[i].Focal = f.focal
+			filePresets[i].AILabel = aiLabel
 		}
 		_, err := processor.ProcessStream(context.Background(), f.data, filePresets,
 			func(_ int, r processor.Result) {

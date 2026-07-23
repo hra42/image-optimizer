@@ -74,6 +74,10 @@ func Upload(store *Store, maxFileBytes int64) fiber.Handler {
 		if err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
+		aiLabel, err := parseAILabel(form.Value)
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
 
 		files := make([]srcFile, 0, len(headers))
 		for i, fh := range headers {
@@ -95,10 +99,44 @@ func Upload(store *Store, maxFileBytes int64) fiber.Handler {
 
 		job := store.Create(total)
 		// Track the goroutine so graceful shutdown can drain in-flight jobs.
-		store.Go(func() { runJob(job, files, imagePresets, bundlePresets) })
+		store.Go(func() { runJob(job, files, imagePresets, bundlePresets, aiLabel) })
 
 		return c.JSON(fiber.Map{"jobId": job.ID})
 	}
+}
+
+func parseAILabel(values map[string][]string) (processor.AILabel, error) {
+	style := firstValue(values["aiLabel"])
+	if style == "" {
+		return processor.AILabel{}, nil
+	}
+	color := firstValue(values["aiLabelColor"])
+	position := firstValue(values["aiLabelPosition"])
+	if color == "" {
+		color = "black"
+	}
+	if position == "" {
+		position = "bottom-right"
+	}
+	if style != "ai" && style != "generated" && style != "modified" {
+		return processor.AILabel{}, fmt.Errorf("invalid AI label %q", style)
+	}
+	if color != "black" && color != "white" {
+		return processor.AILabel{}, fmt.Errorf("invalid AI label color %q", color)
+	}
+	switch position {
+	case "top-left", "top-right", "bottom-left", "bottom-right":
+	default:
+		return processor.AILabel{}, fmt.Errorf("invalid AI label position %q", position)
+	}
+	return processor.AILabel{Style: style, Color: color, Position: position}, nil
+}
+
+func firstValue(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(values[0])
 }
 
 // partitionPresets splits resolved presets into per-image presets (run once per

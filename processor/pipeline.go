@@ -88,6 +88,10 @@ func processImage(buf []byte, p Preset) Result {
 		res.Err = fmt.Errorf("strip metadata %q: %w", p.Name, err)
 		return res
 	}
+	if err := applyAILabel(img, p.AILabel); err != nil {
+		res.Err = fmt.Errorf("stamp %q: %w", p.Name, err)
+		return res
+	}
 
 	// Compress presets carry FormatAuto + a Tier: resolve the output format from
 	// the input and swap in the tier-tuned codec knobs. The resolved preset is

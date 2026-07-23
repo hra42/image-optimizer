@@ -83,6 +83,9 @@ func renderSrcsetVariant(buf []byte, w int, p Preset) ([]byte, error) {
 	if err := img.RemoveMetadata(); err != nil {
 		return nil, fmt.Errorf("strip metadata: %w", err)
 	}
+	if err := applyAILabel(img, p.AILabel); err != nil {
+		return nil, fmt.Errorf("stamp: %w", err)
+	}
 	return export(img, p)
 }
 
