@@ -10,6 +10,7 @@
   import HowItWorks from './components/HowItWorks.svelte';
   import LegalModal from './components/LegalModal.svelte';
   import CropModal from './components/CropModal.svelte';
+  import AILabelOptions from './components/AILabelOptions.svelte';
   import { createProgress } from './stores/progress.svelte.js';
   import { BUNDLE_PRESETS, PACK_PRESETS } from './lib/presets.js';
 
@@ -17,6 +18,10 @@
 
   let files = $state([]); // [{ file, url }]
   let selectedPresets = $state([]); // preset name strings
+  let aiLabelEnabled = $state(false);
+  let aiLabelStyle = $state('generated');
+  let aiLabelColor = $state('black');
+  let aiLabelPosition = $state('bottom-right');
   let legalOpen = $state(null); // 'imprint' | 'privacy' | null
   // The file entry whose crop is being adjusted, or null. Owned here (not in
   // Dropzone) so CropModal renders at the page root, escaping the animate-fade-up
@@ -70,6 +75,11 @@
     for (const entry of files) form.append('files', entry.file);
     form.append('focals', JSON.stringify(focals));
     for (const name of selectedPresets) form.append('presets', name);
+    if (aiLabelEnabled) {
+      form.append('aiLabel', aiLabelStyle);
+      form.append('aiLabelColor', aiLabelColor);
+      form.append('aiLabelPosition', aiLabelPosition);
+    }
 
     let jobId;
     try {
@@ -91,6 +101,10 @@
     progress.reset();
     files = [];
     selectedPresets = [];
+    aiLabelEnabled = false;
+    aiLabelStyle = 'generated';
+    aiLabelColor = 'black';
+    aiLabelPosition = 'bottom-right';
     cropping = null;
     autoDownloaded = false;
   }
@@ -158,11 +172,19 @@
     <div class="animate-fade-up" style="animation-delay: 180ms">
       <PresetSelector bind:selected={selectedPresets} />
     </div>
+    <div class="animate-fade-up" style="animation-delay: 210ms">
+      <AILabelOptions
+        bind:enabled={aiLabelEnabled}
+        bind:style={aiLabelStyle}
+        bind:color={aiLabelColor}
+        bind:position={aiLabelPosition}
+      />
+    </div>
 
     <button
       type="button"
       class="group relative overflow-hidden rounded-lg bg-gradient-to-r from-ctp-mauve via-ctp-lavender to-ctp-blue bg-[length:200%_auto] px-4 py-4 text-center text-lg font-semibold text-ctp-base shadow-lg shadow-ctp-mauve/20 transition-all duration-300 hover:bg-right hover:shadow-xl hover:shadow-ctp-mauve/40 enabled:hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none animate-fade-up"
-      style="animation-delay: 240ms"
+      style="animation-delay: 270ms"
       disabled={!canSubmit}
       onclick={submit}
     >

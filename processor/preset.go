@@ -69,11 +69,11 @@ const (
 // format-specific encoding knobs. A zero Width/Height means "keep the source
 // dimensions" (used by the website_* presets).
 type Preset struct {
-	Name        string
-	Kind        Kind // KindImage (default) or a multi-file pack
-	Format      Format
-	Width       int // 0 = keep original
-	Height      int // 0 = keep original
+	Name   string
+	Kind   Kind // KindImage (default) or a multi-file pack
+	Format Format
+	Width  int // 0 = keep original
+	Height int // 0 = keep original
 	// MaxDim caps the long edge: the image is scaled to fit within a
 	// MaxDim×MaxDim box, preserving aspect ratio, downscale-only (never enlarged,
 	// never cropped). 0 = no cap. Distinct from Width/Height, which crop-to-fill
@@ -95,6 +95,11 @@ type Preset struct {
 	// the preset). Fixed-aspect presets (Resizes()) crop around it instead of using
 	// the default attention crop. Unused by non-resizing and pack/bundle presets.
 	Focal FocalPoint
+
+	// AILabel is copied onto each per-file preset by the handler. The regular
+	// image and srcset paths composite it after resizing; favicon and PDF packs
+	// intentionally ignore it.
+	AILabel AILabel
 }
 
 // FocalPoint is a normalized crop anchor in [0,1] with origin at the top-left.
