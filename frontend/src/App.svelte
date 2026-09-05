@@ -8,7 +8,6 @@
   import PresetSelector from './components/PresetSelector.svelte';
   import ProgressCard from './components/ProgressCard.svelte';
   import HowItWorks from './components/HowItWorks.svelte';
-  import LegalModal from './components/LegalModal.svelte';
   import CropModal from './components/CropModal.svelte';
   import AILabelOptions from './components/AILabelOptions.svelte';
   import { createProgress } from './stores/progress.svelte.js';
@@ -22,7 +21,6 @@
   let aiLabelStyle = $state('generated');
   let aiLabelColor = $state('black');
   let aiLabelPosition = $state('bottom-right');
-  let legalOpen = $state(null); // 'imprint' | 'privacy' | null
   // The file entry whose crop is being adjusted, or null. Owned here (not in
   // Dropzone) so CropModal renders at the page root, escaping the animate-fade-up
   // transform that would otherwise trap its position:fixed overlay.
@@ -274,23 +272,20 @@
     </section>
   {/if}
 
-  <!-- Footer: sticks to the bottom (mt-auto) with legal links that open the
-       in-app modal instead of navigating away. -->
   <footer
     class="mt-auto flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-ctp-surface1 pt-6 text-sm text-ctp-overlay0"
   >
     <span>© Henry Rausch</span>
-    <button type="button" class="hover:text-ctp-blue" onclick={() => (legalOpen = 'imprint')}>
+    <a class="hover:text-ctp-blue" href="https://hra42.com/imprint">
       Imprint
-    </button>
-    <button type="button" class="hover:text-ctp-blue" onclick={() => (legalOpen = 'privacy')}>
+    </a>
+    <a class="hover:text-ctp-blue" href="https://hra42.com/privacy-policy">
       Privacy Policy
-    </button>
+    </a>
     {#if appVersion}
       <span class="text-ctp-overlay0/70" title="Build version">{appVersion}</span>
     {/if}
   </footer>
 </main>
 
-<LegalModal bind:open={legalOpen} />
 <CropModal bind:open={cropping} {selectedPresets} />
