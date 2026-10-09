@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Stage 1: build the Svelte frontend ----
-FROM node:22-slim AS frontend
+FROM node:24-slim AS frontend
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
@@ -12,7 +12,7 @@ RUN npm run build
 # Trixie (not bookworm) for its newer libheif: bookworm's libheif 1.15 rejects
 # iPhone HEICs during decode ("Metadata not correctly assigned to image");
 # trixie's 1.19 decodes them fine. Builder and runtime bases must match.
-FROM golang:1.26-trixie AS builder
+FROM golang:1.27-trixie AS builder
 # libheif-dev provides the HEIF/HEIC loader headers libvips' heifload links
 # against — libvips-dev only recommends it, so install it explicitly or HEIC
 # decoding is silently absent from the build.
