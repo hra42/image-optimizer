@@ -9,13 +9,14 @@
   import ProgressCard from './components/ProgressCard.svelte';
   import HowItWorks from './components/HowItWorks.svelte';
   import CropModal from './components/CropModal.svelte';
+  import BgRemoveModal from './components/BgRemoveModal.svelte';
   import AILabelOptions from './components/AILabelOptions.svelte';
   import { createProgress } from './stores/progress.svelte.js';
   import { BUNDLE_PRESETS, PACK_PRESETS } from './lib/presets.js';
 
   const progress = createProgress();
 
-  let files = $state([]); // [{ file, url }]
+  let files = $state([]); // [{ file, key, url, focal?, matte?, original? }]
   let selectedPresets = $state([]); // preset name strings
   let aiLabelEnabled = $state(false);
   let aiLabelStyle = $state('generated');
@@ -25,6 +26,27 @@
   // Dropzone) so CropModal renders at the page root, escaping the animate-fade-up
   // transform that would otherwise trap its position:fixed overlay.
   let cropping = $state(null);
+  // Same pattern for the background-removal modal.
+  let bgRemoving = $state(null);
+
+  // Runtime settings from /config: where background-removal models are hosted
+  // (empty → feature hidden) and the per-file upload cap.
+  let bgBaseUrl = $state('');
+  let maxFileBytes = $state(0);
+  $effect(() => {
+    let cancelled = false;
+    fetch('/config')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        bgBaseUrl = d.bgRemoval?.baseUrl ?? '';
+        maxFileBytes = d.maxFileBytes ?? 0;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  });
 
   // Build version shown in the footer. Fetched once from /version (injected at
   // build time from the git tag); stays '' if the request fails so the footer
@@ -72,6 +94,9 @@
     const focals = files.map((entry) => entry.focal ?? null);
     for (const entry of files) form.append('files', entry.file);
     form.append('focals', JSON.stringify(focals));
+    // Per-file background ("#rrggbb" or null → white) for flattening cutouts
+    // into JPEG outputs; same indexing as focals.
+    form.append('mattes', JSON.stringify(files.map((entry) => entry.matte ?? null)));
     for (const name of selectedPresets) form.append('presets', name);
     if (aiLabelEnabled) {
       form.append('aiLabel', aiLabelStyle);
@@ -104,6 +129,7 @@
     aiLabelColor = 'black';
     aiLabelPosition = 'bottom-right';
     cropping = null;
+    bgRemoving = null;
     autoDownloaded = false;
   }
 
@@ -165,7 +191,7 @@
       <HowItWorks />
     </div>
     <div class="animate-fade-up" style="animation-delay: 120ms">
-      <Dropzone bind:files {selectedPresets} bind:cropping />
+      <Dropzone bind:files {selectedPresets} bind:cropping bind:bgRemoving bgEnabled={!!bgBaseUrl} />
     </div>
     <div class="animate-fade-up" style="animation-delay: 180ms">
       <PresetSelector bind:selected={selectedPresets} />
@@ -289,3 +315,4 @@
 </main>
 
 <CropModal bind:open={cropping} {selectedPresets} />
+<BgRemoveModal bind:open={bgRemoving} baseUrl={bgBaseUrl} {maxFileBytes} />

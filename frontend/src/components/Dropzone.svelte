@@ -14,6 +14,8 @@
     files = $bindable([]),
     selectedPresets = [],
     cropping = $bindable(null),
+    bgRemoving = $bindable(null),
+    bgEnabled = false,
     disabled = false,
   } = $props();
 
@@ -89,9 +91,19 @@
     files.some((entry) => entry.file.name.toLowerCase().endsWith('.svg')),
   );
 
-  function removeAt(i) {
-    const entry = files[i];
+  function revokeEntry(entry) {
     if (entry?.url) URL.revokeObjectURL(entry.url);
+    if (entry?.original?.url) URL.revokeObjectURL(entry.original.url);
+  }
+
+  // Background removal decodes in the browser, which can't render HEIC/HEIF;
+  // SVG is skipped too (vector logos rarely need it and rasterizing loses that).
+  function canRemoveBg(entry) {
+    return entry.url && !(entry.original?.file ?? entry.file).name.toLowerCase().endsWith('.svg');
+  }
+
+  function removeAt(i) {
+    revokeEntry(files[i]);
     files = files.filter((_, idx) => idx !== i);
   }
 
@@ -99,7 +111,7 @@
   // (HEIC/HEIF entries have a null url and nothing to revoke.)
   $effect(() => {
     return () => {
-      for (const entry of files) if (entry.url) URL.revokeObjectURL(entry.url);
+      for (const entry of files) revokeEntry(entry);
     };
   });
 
@@ -210,6 +222,9 @@
               src={entry.url}
               alt={entry.file.name}
               class="h-12 w-12 flex-none rounded object-cover ring-1 ring-ctp-surface1"
+              style={entry.original
+                ? 'background: repeating-conic-gradient(#8883 0% 25%, transparent 0% 50%) 50% / 12px 12px'
+                : ''}
             />
           {:else}
             <!-- HEIC/HEIF can't be rendered in-browser; show a placeholder. -->
@@ -227,6 +242,7 @@
               {entry.file.name}
             </p>
             <p class="text-sm text-ctp-subtext1">{formatSize(entry.file.size)}</p>
+            <div class="flex flex-wrap gap-x-3">
             {#if anyCrops && entry.url}
               <button
                 type="button"
@@ -241,6 +257,21 @@
                 {entry.focal ? 'Crop adjusted' : 'Adjust crop'}
               </button>
             {/if}
+            {#if bgEnabled && canRemoveBg(entry)}
+              <button
+                type="button"
+                class="mt-1 inline-flex items-center gap-1 text-xs font-medium transition-colors {entry.original
+                  ? 'text-ctp-mauve hover:text-ctp-lavender'
+                  : 'text-ctp-blue hover:text-ctp-mauve'}"
+                onclick={() => (bgRemoving = entry)}
+              >
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
+                </svg>
+                {entry.original ? 'Background removed' : 'Remove background'}
+              </button>
+            {/if}
+            </div>
           </div>
           <button
             type="button"

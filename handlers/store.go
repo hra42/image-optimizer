@@ -42,11 +42,13 @@ type outFile struct {
 
 // srcFile is one uploaded image held in memory while its job runs. focal is the
 // optional per-file crop anchor (from the upload's "focals" field); when unset,
-// fixed-aspect presets fall back to the default attention crop.
+// fixed-aspect presets fall back to the default attention crop. matte is the
+// optional per-file background for alpha-less formats ("mattes" field).
 type srcFile struct {
 	base  string
 	data  []byte
 	focal processor.FocalPoint
+	matte processor.Matte
 }
 
 // Job tracks one upload's lifecycle. Progress is reported as completed work
@@ -348,6 +350,7 @@ func runJob(job *Job, files []srcFile, imagePresets, bundlePresets []processor.P
 		copy(filePresets, imagePresets)
 		for i := range filePresets {
 			filePresets[i].Focal = f.focal
+			filePresets[i].Matte = f.matte
 			filePresets[i].AILabel = aiLabel
 		}
 		_, err := processor.ProcessStream(context.Background(), f.data, filePresets,
@@ -392,11 +395,13 @@ func runJob(job *Job, files []srcFile, imagePresets, bundlePresets []processor.P
 	// order, and emits one top-level output (e.g. a multi-page PDF). ---
 	if len(bundlePresets) > 0 {
 		bufs := make([][]byte, len(files))
+		mattes := make([]processor.Matte, len(files))
 		for i, f := range files {
 			bufs[i] = f.data // files is already in upload order; page order follows
+			mattes[i] = f.matte
 		}
 		for _, p := range bundlePresets {
-			r := processor.ProcessBundle(context.Background(), bufs, p)
+			r := processor.ProcessBundle(context.Background(), bufs, p, mattes)
 			if r.Err == processor.ErrVipsNotBuilt {
 				job.Fail()
 				return

@@ -69,7 +69,7 @@ func main() {
 	// API routes (health, upload, progress SSE, download). Registered before the
 	// SPA catch-all so they are not swallowed by the wildcard route. The returned
 	// store owns job lifecycle; start its TTL reaper and drain it on shutdown.
-	store := handlers.RegisterRoutes(app, cfg.MaxFileBytes, version)
+	store := handlers.RegisterRoutes(app, cfg.MaxFileBytes, version, cfg.BgModelBaseURL)
 	store.StartReaper(ctx, cfg.JobTTL)
 
 	// Serve the embedded Svelte SPA at the root.

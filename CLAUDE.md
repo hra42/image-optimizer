@@ -123,8 +123,19 @@ an in-memory store with no disk or external services.
   rather than failing startup. `MaxUploadBytes` (Fiber `BodyLimit`) is derived
   from `MAX_FILE_SIZE_MB` plus headroom for multipart boundaries.
 
+- **Background removal** (frontend-only inference) — `BgRemoveModal.svelte` +
+  `lib/bgremove.js` run onnxruntime-web in a Web Worker
+  (`lib/bgremove.worker.js`) and swap the entry's file for a transparent PNG.
+  Models are hosted externally at `BG_MODEL_BASE_URL` (exposed to the SPA via
+  `GET /config`) and pinned by SHA-256 in `lib/bgModels.js`. They're built by the
+  uv project in `tools/bg-models/` (a custom BiRefNet export for WebGPU; see its
+  README). The server's only part is the per-file `mattes` form field
+  (parallel to `focals`): `Preset.Matte` is the color `export()` flattens alpha
+  onto for JPEG (white when unset).
+
 Key env vars: `PORT` (3000), `MAX_FILE_SIZE_MB` (50), `WORKER_COUNT` (NumCPU),
-`JOB_TTL_MINUTES` (10). See README for the full table.
+`JOB_TTL_MINUTES` (10), `BG_MODEL_BASE_URL` (unset = feature off). See README for
+the full table.
 
 ## Conventions that matter
 

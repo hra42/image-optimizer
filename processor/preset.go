@@ -96,6 +96,11 @@ type Preset struct {
 	// the default attention crop. Unused by non-resizing and pack/bundle presets.
 	Focal FocalPoint
 
+	// Matte, when Set, is the per-file background color that transparent pixels
+	// are flattened onto for formats without alpha (JPEG, incl. srcset and PDF
+	// pages). Stamped per file like Focal; unset means white.
+	Matte Matte
+
 	// AILabel is copied onto each per-file preset by the handler. The regular
 	// image and srcset paths composite it after resizing; favicon and PDF packs
 	// intentionally ignore it.
@@ -108,6 +113,21 @@ type Preset struct {
 type FocalPoint struct {
 	X, Y float64
 	Set  bool
+}
+
+// Matte is an sRGB background color for flattening alpha. When Set is false the
+// pipeline uses white. Plain data (not vips.Color) so preset.go stays tag-free.
+type Matte struct {
+	R, G, B uint8
+	Set     bool
+}
+
+// RGB returns the matte color, defaulting to white when unset.
+func (m Matte) RGB() (r, g, b uint8) {
+	if !m.Set {
+		return 255, 255, 255
+	}
+	return m.R, m.G, m.B
 }
 
 // focalWindow computes the crop window for a focal-point crop. Given a resized

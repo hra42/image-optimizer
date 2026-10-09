@@ -36,6 +36,6 @@ func ProcessStream(ctx context.Context, buf []byte, presets []Preset, onResult R
 // ProcessBundle reports (via Result.Err) that libvips support was not compiled
 // in. The error is carried in the Result, matching the real implementation's
 // failure path so runJob's bundle phase handles both modes identically.
-func ProcessBundle(ctx context.Context, bufs [][]byte, p Preset) Result {
+func ProcessBundle(ctx context.Context, bufs [][]byte, p Preset, mattes []Matte) Result {
 	return Result{Preset: p, Err: ErrVipsNotBuilt}
 }
