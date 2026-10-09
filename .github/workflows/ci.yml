@@ -14,11 +14,11 @@ jobs:
     name: Go test & vet (stub mode)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
-          go-version: '1.26'
+          go-version-file: go.mod
           cache: true
 
       - name: go vet
@@ -30,13 +30,13 @@ jobs:
   go-vips:
     name: Go test & vet (vips)
     runs-on: ubuntu-latest
-    # Run inside the same Debian bookworm + libvips source as the production
+    # Run inside the same Debian trixie + libvips source as the production
     # Dockerfile builder stage. Debian's libvips ships an AV1 encoder, so AVIF
     # presets encode correctly here — Ubuntu's apt libvips does not, and fails
     # heifsave with "Unsupported compression".
-    container: golang:1.26-bookworm
+    container: golang:1.27-trixie
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The checkout dir is owned by a different UID inside the container, so git
       # refuses to read it and Go's VCS stamping (-buildvcs) fails. Mark it safe.
@@ -46,7 +46,7 @@ jobs:
       - name: Install libvips
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends libvips-dev pkg-config
+          apt-get install -y --no-install-recommends libvips-dev libheif-dev libde265-0 libheif-plugin-aomenc pkg-config
           rm -rf /var/lib/apt/lists/*
 
       - name: go vet (vips)
@@ -65,11 +65,11 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 

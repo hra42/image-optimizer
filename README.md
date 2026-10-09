@@ -219,7 +219,7 @@ headroom for multiple files and multipart boundaries.
 
 ## Requirements
 
-- Go 1.26+ · Node 22+ · Docker
+- Go 1.27.2+ · Node 24+ · Docker
 - libvips ≥ 8.14 (provided inside the Docker images; install locally only if
   building the Go binary outside Docker)
 
