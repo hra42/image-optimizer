@@ -64,10 +64,12 @@ function getSession(key, model, baseUrl, onProgress) {
 
 // Returns verified model bytes, from Cache Storage when possible. The hash is
 // checked on every load (cache included): it's cheap next to inference and
-// guards against a poisoned or truncated cache entry.
+// guards against a poisoned or truncated cache entry. Cache Storage can be
+// unavailable (e.g. some private modes or certificate-error origins); then the
+// model is simply re-downloaded each session.
 async function loadModel(model, url, onProgress) {
-  const cache = await caches.open(MODEL_CACHE);
-  const cached = await cache.match(url);
+  const cache = await self.caches?.open(MODEL_CACHE).catch(() => null);
+  const cached = await cache?.match(url);
   if (cached) {
     const bytes = new Uint8Array(await cached.arrayBuffer());
     if ((await sha256(bytes)) === model.sha256) return bytes;
@@ -91,7 +93,9 @@ async function loadModel(model, url, onProgress) {
   if (loaded !== total || (await sha256(bytes)) !== model.sha256) {
     throw new Error('model failed integrity check');
   }
-  await cache.put(url, new Response(bytes, { headers: { 'Content-Type': 'application/octet-stream' } }));
+  await cache
+    ?.put(url, new Response(bytes, { headers: { 'Content-Type': 'application/octet-stream' } }))
+    .catch(() => {}); // quota exceeded etc.: still usable, just not cached
   return bytes;
 }
 
