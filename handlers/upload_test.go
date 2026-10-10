@@ -149,3 +149,42 @@ func TestParseAILabel(t *testing.T) {
 		}
 	}
 }
+
+func TestParseMattes(t *testing.T) {
+	t.Run("absent yields all-unset", func(t *testing.T) {
+		got, err := parseMattes(nil, 2)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 2 || got[0].Set || got[1].Set {
+			t.Fatalf("got %+v, want 2 unset mattes", got)
+		}
+	})
+
+	t.Run("null entries stay unset, colors parse", func(t *testing.T) {
+		got, err := parseMattes([]string{`["#ff8000", null]`}, 2)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if want := (processor.Matte{R: 0xff, G: 0x80, B: 0x00, Set: true}); got[0] != want {
+			t.Errorf("matte[0] = %+v, want %+v", got[0], want)
+		}
+		if got[1].Set {
+			t.Errorf("matte[1] should be unset")
+		}
+	})
+
+	for name, in := range map[string]string{
+		"not an array":    `"#ffffff"`,
+		"length mismatch": `["#ffffff"]`,
+		"no hash":         `["ffffff", null]`,
+		"short form":      `["#fff", null]`,
+		"bad hex":         `["#gggggg", null]`,
+	} {
+		t.Run("rejects "+name, func(t *testing.T) {
+			if _, err := parseMattes([]string{in}, 2); err == nil {
+				t.Errorf("parseMattes(%s) = nil error, want error", in)
+			}
+		})
+	}
+}

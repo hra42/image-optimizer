@@ -7,6 +7,7 @@ import (
 	"context"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"testing"
 
@@ -449,7 +450,7 @@ func TestProcessBundleDocumentPDF(t *testing.T) {
 		makeSourcePNG(t, 1000, 2000),
 	}
 
-	r := ProcessBundle(context.Background(), bufs, p)
+	r := ProcessBundle(context.Background(), bufs, p, nil)
 	if r.Err != nil {
 		t.Fatalf("ProcessBundle: %v", r.Err)
 	}
@@ -471,8 +472,67 @@ func TestProcessBundleCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	r := ProcessBundle(ctx, [][]byte{makeSourcePNG(t, 400, 400)}, p)
+	r := ProcessBundle(ctx, [][]byte{makeSourcePNG(t, 400, 400)}, p, nil)
 	if r.Err == nil {
 		t.Error("ProcessBundle with a cancelled context returned nil Err, want context.Canceled")
+	}
+}
+
+// TestJPEGFlattensAlphaOntoMatte verifies a fully transparent source exported to
+// JPEG takes the preset's matte color (white when unset), while PNG keeps the
+// alpha channel.
+func TestJPEGFlattensAlphaOntoMatte(t *testing.T) {
+	img := image.NewNRGBA(image.Rect(0, 0, 32, 32)) // all pixels transparent
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("encode source png: %v", err)
+	}
+	src := buf.Bytes()
+
+	cases := map[string]struct {
+		matte   Matte
+		r, g, b uint8
+	}{
+		"unset is white": {Matte{}, 255, 255, 255},
+		"red matte":      {Matte{R: 255, Set: true}, 255, 0, 0},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ref, err := vips.NewImageFromBuffer(src)
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			defer ref.Close()
+			out, err := export(ref, Preset{Format: FormatJPEG, Quality: 95, Matte: tc.matte})
+			if err != nil {
+				t.Fatalf("export: %v", err)
+			}
+			got, err := jpeg.Decode(bytes.NewReader(out))
+			if err != nil {
+				t.Fatalf("decode jpeg: %v", err)
+			}
+			r, g, b, _ := got.At(16, 16).RGBA()
+			near := func(a uint32, want uint8) bool { d := int(a>>8) - int(want); return d > -8 && d < 8 }
+			if !near(r, tc.r) || !near(g, tc.g) || !near(b, tc.b) {
+				t.Errorf("center pixel = (%d,%d,%d), want ~(%d,%d,%d)", r>>8, g>>8, b>>8, tc.r, tc.g, tc.b)
+			}
+		})
+	}
+
+	ref, err := vips.NewImageFromBuffer(src)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	defer ref.Close()
+	out, err := export(ref, Preset{Format: FormatPNG, Compression: 6, Matte: Matte{R: 255, Set: true}})
+	if err != nil {
+		t.Fatalf("export png: %v", err)
+	}
+	got, err := png.Decode(bytes.NewReader(out))
+	if err != nil {
+		t.Fatalf("decode png: %v", err)
+	}
+	if _, _, _, a := got.At(16, 16).RGBA(); a != 0 {
+		t.Errorf("PNG alpha = %d, want 0 (matte must not apply to alpha-capable formats)", a)
 	}
 }

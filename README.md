@@ -39,6 +39,9 @@ step, runs entirely on your own server, and never writes your images to disk.
   `apple-touch-icon`, `site.webmanifest`, and a ready-to-paste HTML snippet.
 - **Social presets** — Instagram, LinkedIn, X, Facebook, Pinterest, Open Graph,
   plus email/web banners.
+- **Background removal** — optional, in-browser cutouts (BiRefNet on WebGPU, a
+  lighter CPU model otherwise); the result flows into every preset, with a
+  chosen background color for JPEG outputs. See [Background removal](#background-removal).
 - **Live progress** — per-target progress streamed over Server-Sent Events.
 - **Privacy by design** — images are processed in memory only and deleted right
   after download (or after a short timeout); nothing is stored.
@@ -213,10 +216,31 @@ the default rather than failing startup.
 | `MAX_FILE_SIZE_MB` | `50`             | Per-file upload cap. Larger files are rejected with `400`.         |
 | `WORKER_COUNT`     | number of CPUs   | Max concurrent libvips pipelines (the real concurrency limit).     |
 | `JOB_TTL_MINUTES`  | `10`             | How long a job's in-memory state is retained before the reaper frees it. |
+| `BG_MODEL_BASE_URL` | *(unset)*       | Base URL of the background-removal models (CORS-enabled static host). Unset hides the feature. |
 
 The whole-request multipart body limit is derived from `MAX_FILE_SIZE_MB` plus
 headroom for multiple files and multipart boundaries.
 
+
+## Background removal
+
+"Remove background" on a thumbnail cuts the subject out **in the browser**:
+onnxruntime-web runs the model in a Web Worker, and the image isn't sent anywhere
+for this step. The resulting transparent PNG then replaces the file in the normal
+upload. PNG/WebP/AVIF and favicon outputs keep the transparency; JPEG outputs
+(including PDF pages) are flattened onto the background color picked in the
+dialog, white by default.
+
+- **Model selection:** browsers with WebGPU (and `shader-f16`) use BiRefNet_lite
+  (MIT, ~101 MB). Others use ormbg (Apache-2.0, ~88 MB) on the CPU, which takes
+  several seconds per image. Models
+  download once, are checked against pinned SHA-256 hashes, and are cached in
+  the browser.
+- **Hosting:** the models are not baked into the image. Build them with
+  [`tools/bg-models`](tools/bg-models/README.md), put them on any static host
+  with CORS (e.g. Cloudflare R2), and set `BG_MODEL_BASE_URL`. The ONNX runtime's
+  own `.wasm` (~27 MB) is served by the app itself and only fetched when the
+  feature is used.
 ## Requirements
 
 - Go 1.27.2+ · Node 24+ · Docker

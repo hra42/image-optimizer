@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -74,6 +75,11 @@ func Upload(store *Store, maxFileBytes int64) fiber.Handler {
 		if err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
+		// Optional per-file flatten colors for alpha-less formats (see parseMattes).
+		mattes, err := parseMattes(form.Value["mattes"], len(headers))
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
 		aiLabel, err := parseAILabel(form.Value)
 		if err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
@@ -89,6 +95,7 @@ func Upload(store *Store, maxFileBytes int64) fiber.Handler {
 				base:  baseName(fh.Filename),
 				data:  data,
 				focal: focals[i],
+				matte: mattes[i],
 			})
 		}
 
@@ -210,6 +217,47 @@ func parseFocals(values []string, n int) ([]processor.FocalPoint, error) {
 		out[i] = processor.FocalPoint{X: clamp01(r.X), Y: clamp01(r.Y), Set: true}
 	}
 	return out, nil
+}
+
+// parseMattes resolves the optional "mattes" form value into one Matte per
+// uploaded file, mirroring parseFocals: a single JSON array parallel to the
+// files whose elements are "#rrggbb" or null (null → default white). A length
+// mismatch or malformed color rejects the upload rather than misapplying it.
+func parseMattes(values []string, n int) ([]processor.Matte, error) {
+	out := make([]processor.Matte, n) // zero value = {Set: false} → white
+	if len(values) == 0 || strings.TrimSpace(values[0]) == "" {
+		return out, nil
+	}
+	var raw []*string
+	if err := json.Unmarshal([]byte(values[0]), &raw); err != nil {
+		return nil, errors.New("invalid mattes: expected a JSON array")
+	}
+	if len(raw) != n {
+		return nil, fmt.Errorf("mattes length %d does not match %d files", len(raw), n)
+	}
+	for i, r := range raw {
+		if r == nil {
+			continue
+		}
+		m, ok := parseHexColor(*r)
+		if !ok {
+			return nil, fmt.Errorf("invalid matte color %q: expected #rrggbb", *r)
+		}
+		out[i] = m
+	}
+	return out, nil
+}
+
+// parseHexColor parses a "#rrggbb" color.
+func parseHexColor(s string) (processor.Matte, bool) {
+	if len(s) != 7 || s[0] != '#' {
+		return processor.Matte{}, false
+	}
+	b, err := hex.DecodeString(s[1:])
+	if err != nil {
+		return processor.Matte{}, false
+	}
+	return processor.Matte{R: b[0], G: b[1], B: b[2], Set: true}, true
 }
 
 // clamp01 constrains v to the [0,1] normalized range.

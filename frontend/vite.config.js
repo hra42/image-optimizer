@@ -33,4 +33,12 @@ export default defineConfig({
   server: {
     port: 5173,
   },
+  // onnxruntime-web locates its .wasm via `new URL(..., import.meta.url)`;
+  // pre-bundling would rewrite that path and break it in dev.
+  optimizeDeps: {
+    exclude: ['onnxruntime-web'],
+  },
+  worker: {
+    format: 'es',
+  },
 });

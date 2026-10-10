@@ -233,6 +233,14 @@ func loadSVGAtDensity(buf []byte, density int) (*vips.ImageRef, error) {
 func export(img *vips.ImageRef, p Preset) ([]byte, error) {
 	switch p.Format {
 	case FormatJPEG:
+		// JPEG has no alpha: flatten onto the per-file matte (white by default)
+		// rather than leaving the composite to jpegsave's implicit handling.
+		if img.HasAlpha() {
+			r, g, b := p.Matte.RGB()
+			if err := img.Flatten(&vips.Color{R: r, G: g, B: b}); err != nil {
+				return nil, err
+			}
+		}
 		out, _, err := img.ExportJpeg(&vips.JpegExportParams{
 			Quality:       p.Quality,
 			Interlace:     p.Progressive,

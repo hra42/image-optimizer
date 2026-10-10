@@ -1,0 +1,32 @@
+[project]
+name = "bg-models"
+version = "0.1.0"
+description = "Export and verify the in-browser background-removal ONNX models"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "torch>=2.8",
+    "torchvision",
+    "transformers>=4.50",
+    "timm",
+    "kornia",
+    "einops",
+    "huggingface-hub",
+    "onnx>=1.18",
+    "onnxslim",
+    "onnxruntime>=1.22",
+    "onnxconverter-common",
+    "numpy",
+    "pillow",
+]
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }

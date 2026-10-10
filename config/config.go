@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -34,6 +35,11 @@ type Config struct {
 	// JobTTL is how long a job's in-memory state (including its output bytes)
 	// is retained before the reaper frees it (JOB_TTL_MINUTES, default 10m).
 	JobTTL time.Duration
+
+	// BgModelBaseURL is where the browser fetches the background-removal models
+	// (BG_MODEL_BASE_URL, e.g. an R2 bucket with CORS). Empty disables the
+	// feature in the UI. Stored without a trailing slash.
+	BgModelBaseURL string
 }
 
 const (
@@ -60,10 +66,11 @@ func Load() Config {
 		MaxUploadBytes: maxFileBytes + uploadHeadroomBytes,
 		Workers:        workers,
 		JobTTL:         time.Duration(ttlMin) * time.Minute,
+		BgModelBaseURL: strings.TrimRight(os.Getenv("BG_MODEL_BASE_URL"), "/"),
 	}
 
-	log.Printf("config: port=%s maxFile=%dMB workers=%d jobTTL=%s",
-		cfg.Port, cfg.MaxFileBytes>>20, cfg.Workers, cfg.JobTTL)
+	log.Printf("config: port=%s maxFile=%dMB workers=%d jobTTL=%s bgModels=%q",
+		cfg.Port, cfg.MaxFileBytes>>20, cfg.Workers, cfg.JobTTL, cfg.BgModelBaseURL)
 
 	return cfg
 }

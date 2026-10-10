@@ -37,6 +37,7 @@ func TestLoadOverrides(t *testing.T) {
 	t.Setenv("MAX_FILE_SIZE_MB", "10")
 	t.Setenv("WORKER_COUNT", "3")
 	t.Setenv("JOB_TTL_MINUTES", "1")
+	t.Setenv("BG_MODEL_BASE_URL", "https://models.example.com/bg/")
 
 	cfg := Load()
 
@@ -51,6 +52,9 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if cfg.JobTTL != time.Minute {
 		t.Errorf("JobTTL = %s, want 1m", cfg.JobTTL)
+	}
+	if want := "https://models.example.com/bg"; cfg.BgModelBaseURL != want {
+		t.Errorf("BgModelBaseURL = %q, want %q (trailing slash trimmed)", cfg.BgModelBaseURL, want)
 	}
 }
 
