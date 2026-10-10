@@ -21,8 +21,23 @@ function getWorker() {
       if (data.type === 'done') req.resolve(data);
       else req.reject(Object.assign(new Error(data.message), { fallback: data.fallback }));
     };
+    // A worker that fails to load (stale asset after a redeploy, CSP) or throws
+    // uncaught never answers, so fail every in-flight request and start a fresh
+    // worker next time instead of leaving the modal waiting forever.
+    worker.onerror = (e) => {
+      e.preventDefault();
+      worker.terminate();
+      worker = null;
+      failAll(e.message || 'The background-removal worker failed to load.');
+    };
+    worker.onmessageerror = () => failAll('Could not read the result from the background-removal worker.');
   }
   return worker;
+}
+
+function failAll(message) {
+  for (const req of pending.values()) req.reject(new Error(message));
+  pending.clear();
 }
 
 // BiRefNet when the browser exposes a WebGPU adapter with fp16 shaders (the
