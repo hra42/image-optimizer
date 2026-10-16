@@ -5,7 +5,7 @@ go 1.27.2
 require (
 	github.com/davidbyttow/govips/v2 v2.19.0
 	github.com/go-pdf/fpdf v0.9.0
-	github.com/gofiber/fiber/v3 v3.5.0
+	github.com/gofiber/fiber/v3 v3.6.0
 	github.com/google/uuid v1.6.0
 	golang.org/x/sync v0.24.0
 )
