@@ -3,7 +3,7 @@ module github.com/hra42/image-optimizer
 go 1.27.2
 
 require (
-	github.com/davidbyttow/govips/v2 v2.19.0
+	github.com/davidbyttow/govips/v2 v2.20.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/google/uuid v1.6.0
