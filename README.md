@@ -243,7 +243,7 @@ dialog, white by default.
   feature is used.
 ## Requirements
 
-- Go 1.27.2+ · Node 24+ · Docker
+- Go 1.27.2+ · Node 26+ · Docker
 - libvips ≥ 8.14 (provided inside the Docker images; install locally only if
   building the Go binary outside Docker)
 
