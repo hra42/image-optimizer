@@ -1,0 +1,28 @@
+# Build and publish the production image to GHCR on release tags (v*).
+# Replaces .github/workflows/docker.yml.
+#
+# Kaniko builds unprivileged; buildx would need WOODPECKER_PLUGINS_PRIVILEGED.
+# Needs repo secrets `ghcr_username` and `ghcr_token` (a PAT with
+# write:packages), restricted to this plugin image.
+when:
+  - event: tag
+    ref: refs/tags/v*
+  - event: manual
+
+steps:
+  - name: publish
+    image: woodpeckerci/plugin-kaniko:2
+    settings:
+      registry: ghcr.io
+      repo: hra42/image-optimizer
+      username:
+        from_secret: ghcr_username
+      password:
+        from_secret: ghcr_token
+      dockerfile: Dockerfile
+      # v1.2.3 -> 1.2.3, 1.2, 1, latest (as metadata-action did); a manual run
+      # without a tag pushes only `latest`.
+      auto_tag: true
+      # Release string shown in the UI footer via /version, e.g. "v0.4.0".
+      # Strips refs/tags/ or refs/heads/, so a manual run gets the branch name.
+      build_args: VERSION=${CI_COMMIT_REF##refs/*/}

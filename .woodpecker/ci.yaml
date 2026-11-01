@@ -1,0 +1,45 @@
+# Go (stub + vips) and frontend checks. Replaces .github/workflows/ci.yml.
+#
+# Pushes run only on main; branches are covered by their pull requests.
+when:
+  - event: push
+    branch: main
+  - event: [pull_request, manual]
+
+steps:
+  # All steps are graph roots, so Woodpecker runs them in parallel.
+
+  # Tag-free packages, no libvips: what `go test ./...` runs locally.
+  - name: go-stub
+    image: golang:1.27-trixie
+    depends_on: []
+    environment:
+      # The checkout belongs to another uid, so git refuses it and VCS stamping
+      # fails. Nothing here ships the binary.
+      GOFLAGS: -buildvcs=false
+    commands:
+      - go vet ./...
+      - go test ./...
+
+  # Same Debian trixie + libvips source as the Dockerfile builder stage. Debian's
+  # libvips has an AV1 encoder, so AVIF presets encode correctly here.
+  - name: go-vips
+    image: golang:1.27-trixie
+    depends_on: []
+    environment:
+      GOFLAGS: -buildvcs=false
+      CGO_ENABLED: "1"
+    commands:
+      - apt-get update
+      - apt-get install -y --no-install-recommends libvips-dev libheif-dev libde265-0 libheif-plugin-aomenc pkg-config
+      - go vet -tags vips ./...
+      - go test -tags vips ./...
+      - go build -tags vips -o /dev/null .
+
+  - name: frontend
+    image: node:26-slim
+    depends_on: []
+    commands:
+      - cd frontend
+      - npm ci
+      - npm run build

@@ -20,7 +20,7 @@ services:
       - go-mod-cache:/go/pkg/mod
 
   frontend:
-    image: node:24-slim
+    image: node:26-slim
     working_dir: /app/frontend
     command: sh -c "npm install && npm run dev"
     ports:

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- Stage 1: build the Svelte frontend ----
-FROM node:24-slim AS frontend
+FROM node:26-slim AS frontend
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
