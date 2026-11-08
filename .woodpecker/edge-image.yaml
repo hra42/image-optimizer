@@ -1,0 +1,23 @@
+# Temporary test build for the edge migration; release-tag publishing remains
+# in docker.yaml and is not triggered by this branch.
+when:
+  - event: manual
+    branch: migrate/edge-images
+
+depends_on: [ci]
+
+steps:
+  - name: publish
+    image: woodpeckerci/plugin-kaniko:2
+    settings:
+      registry: ghcr.io
+      repo: hra42/image-optimizer
+      username:
+        from_secret: ghcr_username
+      password:
+        from_secret: ghcr_token
+      dockerfile: Dockerfile
+      tags:
+        - test-${CI_PIPELINE_NUMBER}-${CI_COMMIT_SHA:0:7}
+      build_args:
+        - VERSION=${CI_COMMIT_SHA}
