@@ -1,8 +1,9 @@
-# Temporary test build for the edge migration; release-tag publishing remains
-# in docker.yaml and is not triggered by this branch.
+# Publish verified main builds for edge GitOps. Release tags remain in docker.yaml.
 when:
+  - event: push
+    branch: main
   - event: manual
-    branch: migrate/edge-images
+    branch: main
 
 depends_on: [ci]
 
@@ -18,6 +19,6 @@ steps:
         from_secret: ghcr_token
       dockerfile: Dockerfile
       tags:
-        - test-${CI_PIPELINE_NUMBER}-${CI_COMMIT_SHA:0:7}
+        - main-${CI_PIPELINE_NUMBER}-${CI_COMMIT_SHA:0:7}
       build_args:
         - VERSION=${CI_COMMIT_SHA}
